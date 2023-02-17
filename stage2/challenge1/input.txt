@@ -1,0 +1,8 @@
+begin
+    read (b);
+    read (c);
+    read (d);
+    read (e);
+    a=b+(c+d)+e;
+    write (a);
+end; 

@@ -1,0 +1,10 @@
+begin
+read (a);
+
+do
+    b = b + a;
+    read(a);
+while(a!=0);
+
+write(b);
+end;

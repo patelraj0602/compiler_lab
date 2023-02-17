@@ -1,0 +1,16 @@
+decl
+    int num, sum;
+    str mesg;
+    int val1, val2;
+enddecl
+
+begin
+read(num);
+val1 = 50;
+mesg = "Hello World";
+val2 = 36;
+write(num);
+write(mesg);
+write(val1);
+write(val2);
+end;
