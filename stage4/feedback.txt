@@ -1,8 +1,0 @@
-=> Refactor the code for declarations. Make an global table to store the data types.
-=> Add type checks for write(type has to int) and while(type has to bool) constructs in the Create Tree function
-    (Wherever there are two branchs always check for type compatibility before creating the tree.)
-=> Refer the data structures given in the documentation.
-=> Change that ternary tree structure which was introduced for if/else constructs.
-=> Maintain an stack in codeGen for supporting break and continue.
-=> Return an struct in codeGen that returns value and address and maybe register numbers of any particular variable.
-=> data types include void,int,str,bool.

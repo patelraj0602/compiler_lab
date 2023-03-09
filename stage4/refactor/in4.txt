@@ -1,0 +1,35 @@
+decl
+   int n,m,i,j;
+enddecl
+begin
+
+read(n);
+read(m);
+
+i=0;
+while(i<n) do
+    if(i == 2) then
+        i = i+1;
+        continue;
+    endif;
+    if(i == 5) then
+        break;
+    endif;
+
+    j=i+1;
+    while(j<m) do
+        if(j == 5) then
+            j=j+1;
+            continue;
+        else
+            if(j == 10) then
+                break;
+            else
+                write(j);
+            endif;
+            j = j+1;
+        endif;
+    endwhile;
+    i = i+1;
+endwhile;
+end;

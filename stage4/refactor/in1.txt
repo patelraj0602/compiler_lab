@@ -1,0 +1,12 @@
+decl
+    int num, sum;
+    str mesg;
+    int val1, val2;
+enddecl
+
+begin
+read(val1);
+if(val1<10) then
+    write(val1<20);
+endif;
+end;
