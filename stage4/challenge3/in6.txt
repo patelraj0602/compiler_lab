@@ -1,0 +1,13 @@
+decl
+   int *n,*i,m,o,arr[5];
+   str a,b,*c;
+enddecl
+
+begin
+    read(m);
+    n = &m;
+    i = &o;
+    *i = *n + 5;
+    write(*i);
+    write(o);
+end;

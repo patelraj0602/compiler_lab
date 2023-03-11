@@ -1,0 +1,11 @@
+decl
+   int *n,m,*i;
+   str a,b,*c;
+enddecl
+
+begin
+   n = &m;
+   read(*n);
+   i = &*n;
+   write(*i);
+end;

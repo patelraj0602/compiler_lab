@@ -1,8 +1,0 @@
-Done => Add type checks for write(type has to int) and while(type has to bool) constructs in the Create Tree function
-Done => data types include void,int,str,bool.
-Done => Maintain an stack in codeGen for supporting break and continue.
-Later_Stage => Refactor the code for declarations. Make an global table to store the data types.
-    (Wherever there are two branchs always check for type compatibility before creating the tree.)
-Done => Refer the data structures given in the documentation.
-
-Will Consider based on later stages => Return an struct in codeGen that returns value and address and maybe register numbers of any particular variable.

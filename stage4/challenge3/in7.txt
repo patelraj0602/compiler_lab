@@ -1,0 +1,11 @@
+decl
+   int *n,*i,m,o,arr[5],arr1[10][20];
+   str a,b,*c;
+enddecl
+
+begin
+    read(arr1[1][1]);
+    arr1[1][2] = 10;
+    write(arr1[1][1]);
+    write(arr1[1][2]);
+end;
