@@ -10,7 +10,7 @@ int number;
 
 %%
 
-"decl"                  {return DECL;}
+"decl"                  {return DECL;} 
 "enddecl"               {return ENDDECL;}
 "int"                   {return INT;}
 "str"                   {return STR;}
@@ -29,19 +29,26 @@ int number;
 "write"                 {return WRITE;}  
 "repeat"                {return REPEAT;}
 "until"                 {return UNTIL;}
-[0-9]+                  {number = atoi(yytext); yylval.no = createTree(number,intType,NULL,valNode,NULL,NULL,NULL,NULL); return NUM;}
+"main"                  {return MAIN;}
+"return"                {return RETURN;}
 [a-zA-Z][a-zA-Z0-9]*    {yylval.str = strdup(yytext); return ID;} 
+[0-9]+                  {
+                            number = atoi(yytext); 
+                            yylval.no = createTree(number,intType,NULL,valNode,NULL,NULL,NULL,NULL,NULL,NULL); 
+                            return NUM;
+                        }
 ["]([^"\n]|\\(.|\n))*["] {
                             char* temp = malloc(yyleng -1);
                             memcpy(temp, yytext + 1, yyleng - 2);
                             temp[yyleng - 2] = 0; 
-                            yylval.no = createTree(noNumber,strType,temp,strNode,NULL,NULL,NULL,NULL);
+                            yylval.no = createTree(noNumber,strType,temp,strNode,NULL,NULL,NULL,NULL,NULL,NULL);
                             return STRING; 
                         } 
 "+"                     {return PLUS;}  
 "-"                     {return MINUS;}  
-"*"                     {return MUL;} 
+"*"                     {return STAR;} 
 "/"                     {return DIV;} 
+"&"                     {return ADDR;}
 ";"                     {return SEMICOLON;} 
 "="                     {return ASSIGN;} 
 "<"                     {return LT;}
@@ -51,9 +58,9 @@ int number;
 "!="                    {return NE;}
 "=="                    {return ET;}
 [ \t]                   {}
-[()]                    {return *yytext;}
-[,]                     {return *yytext;}
+[(){}]                  {return *yytext;}
 [\[\]]                  {return *yytext;}
+[,]                     {return *yytext;}
 [\n]                    {}
 .                       {yyerror("unknown character\n");exit(1);}
 

@@ -9,5 +9,5 @@ struct labelAddressTable{
 };
 
 void addLabel(struct labelAddressTable* top, char* labelName, int address);
-int searchLabel(struct labelAddressTable* top, char* labelName);
+int searchLabel(struct labelAddressTable* top, char* labelName); 
 void printLabelAddressTable(struct labelAddressTable* top);  

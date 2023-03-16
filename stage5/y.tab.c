@@ -68,9 +68,9 @@
 /* First part of user prologue.  */
 #line 1 "exprtree.y"
 
-
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "exprtree.h" 
 #include "exprtree.c"
 #include "registers.h"
@@ -79,7 +79,13 @@ int yylex(void);
 extern FILE* yyin; 
 extern char* yytext;
 
-#line 83 "y.tab.c"
+// Global variables.
+int binding = 4095;                                     // Always points to the top of stack    
+int curType = undefined;                                // Stores the current type(int,str) of the variables
+int fLabel = -1;                                        // Stores function label
+    
+
+#line 89 "y.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -138,7 +144,7 @@ extern int yydebug;
     ASSIGN = 266,
     PLUS = 267,
     MINUS = 268,
-    MUL = 269,
+    STAR = 269,
     DIV = 270,
     LT = 271,
     GT = 272,
@@ -160,7 +166,10 @@ extern int yydebug;
     INT = 288,
     STR = 289,
     DECL = 290,
-    ENDDECL = 291
+    ENDDECL = 291,
+    ADDR = 292,
+    MAIN = 293,
+    RETURN = 294
   };
 #endif
 /* Tokens.  */
@@ -175,7 +184,7 @@ extern int yydebug;
 #define ASSIGN 266
 #define PLUS 267
 #define MINUS 268
-#define MUL 269
+#define STAR 269
 #define DIV 270
 #define LT 271
 #define GT 272
@@ -198,19 +207,24 @@ extern int yydebug;
 #define STR 289
 #define DECL 290
 #define ENDDECL 291
+#define ADDR 292
+#define MAIN 293
+#define RETURN 294
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 14 "exprtree.y"
-
+#line 20 "exprtree.y"
+ 
   int num;
   char* str;
-  struct tnode *no; 
-  struct gsymbol *gnode; 
+  struct tnode* no; 
+  struct gsymbol* gnode;
+  struct lsymbol* lnode;
+  struct paramList* pl;
 
-#line 214 "y.tab.c"
+#line 228 "y.tab.c"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -324,7 +338,7 @@ typedef int yytype_uint16;
 #define YYSIZEOF(X) YY_CAST (YYPTRDIFF_T, sizeof (X))
 
 /* Stored state numbers (used for stacks). */
-typedef yytype_int8 yy_state_t;
+typedef yytype_uint8 yy_state_t;
 
 /* State numbers in computations.  */
 typedef int yy_state_fast_t;
@@ -527,21 +541,21 @@ union yyalloc
 #endif /* !YYCOPY_NEEDED */
 
 /* YYFINAL -- State number of the termination state.  */
-#define YYFINAL  9
+#define YYFINAL  14
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   27
+#define YYLAST   653
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  42
+#define YYNTOKENS  47
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  7
+#define YYNNTS  33
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  15
+#define YYNRULES  87
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  30
+#define YYNSTATES  208
 
 #define YYUNDEFTOK  2
-#define YYMAXUTOK   291
+#define YYMAXUTOK   294
 
 
 /* YYTRANSLATE(TOKEN-NUM) -- Symbol number corresponding to TOKEN-NUM
@@ -557,15 +571,15 @@ static const yytype_int8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      40,    41,     2,     2,    37,     2,     2,     2,     2,     2,
+      41,    42,     2,     2,    40,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    38,     2,    39,     2,     2,     2,     2,     2,     2,
+       2,    43,     2,    44,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,    45,     2,    46,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -582,15 +596,22 @@ static const yytype_int8 yytranslate[] =
        5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
-      35,    36
+      35,    36,    37,    38,    39
 };
 
 #if YYDEBUG
   /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
-static const yytype_int8 yyrline[] =
+static const yytype_int16 yyrline[] =
 {
-       0,    63,    63,    72,    75,    76,    79,    88,    89,    92,
-      93,    94,    99,   100,   101,   108
+       0,    60,    60,    75,    85,    92,   103,   106,   107,   111,
+     124,   125,   129,   130,   136,   140,   144,   145,   146,   150,
+     151,   154,   155,   159,   194,   195,   199,   200,   203,   204,
+     209,   213,   216,   230,   245,   253,   263,   266,   279,   280,
+     284,   285,   290,   291,   294,   295,   296,   297,   298,   299,
+     300,   301,   302,   303,   304,   305,   308,   311,   314,   315,
+     321,   322,   325,   328,   331,   335,   336,   337,   338,   339,
+     340,   341,   342,   343,   344,   345,   346,   347,   348,   349,
+     350,   353,   358,   363,   364,   365,   366,   367
 };
 #endif
 
@@ -600,11 +621,16 @@ static const yytype_int8 yyrline[] =
 static const char *const yytname[] =
 {
   "$end", "error", "$undefined", "NUM", "ID", "STRING", "END", "BEG",
-  "READ", "WRITE", "SEMICOLON", "ASSIGN", "PLUS", "MINUS", "MUL", "DIV",
+  "READ", "WRITE", "SEMICOLON", "ASSIGN", "PLUS", "MINUS", "STAR", "DIV",
   "LT", "GT", "LE", "GE", "NE", "ET", "IF", "THEN", "ELSE", "ENDIF",
   "WHILE", "ENDWHILE", "DO", "BREAK", "CONTINUE", "REPEAT", "UNTIL", "INT",
-  "STR", "DECL", "ENDDECL", "','", "'['", "']'", "'('", "')'", "$accept",
-  "declarations", "declList", "decl", "type", "varList", "idDecl", YY_NULLPTR
+  "STR", "DECL", "ENDDECL", "ADDR", "MAIN", "RETURN", "','", "'('", "')'",
+  "'['", "']'", "'{'", "'}'", "$accept", "program", "gDeclBlock",
+  "gDeclList", "gDecl", "gidList", "gid", "identifierDecl", "fDefBlock",
+  "fDef", "fName", "paramList", "param", "type", "mainBlock", "mainHeader",
+  "lDeclBlock", "lDeclList", "lDecl", "lIdList", "lId", "sList", "stmt",
+  "inputStmt", "outputStmt", "assignStmt", "ifStmt", "whileStmt",
+  "doWhileStmt", "repeatUntilStmt", "expr", "argList", "identifier", YY_NULLPTR
 };
 #endif
 
@@ -616,12 +642,12 @@ static const yytype_int16 yytoknum[] =
        0,   256,   257,   258,   259,   260,   261,   262,   263,   264,
      265,   266,   267,   268,   269,   270,   271,   272,   273,   274,
      275,   276,   277,   278,   279,   280,   281,   282,   283,   284,
-     285,   286,   287,   288,   289,   290,   291,    44,    91,    93,
-      40,    41
+     285,   286,   287,   288,   289,   290,   291,   292,   293,   294,
+      44,    40,    41,    91,    93,   123,   125
 };
 # endif
 
-#define YYPACT_NINF (-33)
+#define YYPACT_NINF (-79)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
@@ -633,11 +659,29 @@ static const yytype_int16 yytoknum[] =
 
   /* YYPACT[STATE-NUM] -- Index in YYTABLE of the portion describing
      STATE-NUM.  */
-static const yytype_int8 yypact[] =
+static const yytype_int16 yypact[] =
 {
-     -32,   -32,     7,   -33,   -33,   -33,   -28,   -33,     5,   -33,
-     -33,   -33,   -33,   -10,   -27,   -33,     5,     9,   -25,   -29,
-      11,   -23,   -22,    13,   -20,   -19,    16,   -33,   -18,   -33
+       6,   -33,    68,    25,    89,   -79,   -17,     9,   -79,   -79,
+     -79,    73,   -79,    26,   -79,   -33,    89,   -79,    19,    65,
+     -79,    37,    55,   -79,   -79,    78,    29,     4,   -79,   -79,
+     -79,   -79,    37,    71,    77,   121,   -79,   108,    48,   107,
+     -79,   -79,    26,   125,   108,   -79,    54,    84,   -79,   171,
+      63,   -79,    57,   -79,    83,   -79,    -3,    48,   424,   -79,
+     -79,   199,    91,   -79,   149,    27,   -79,   -79,   -79,    93,
+     112,   118,   120,   122,   123,   368,   152,   156,   368,    48,
+     227,   -79,   -79,   -79,   -79,   -79,   -79,   -79,   -79,   159,
+     108,   -79,   -79,   172,     5,    48,   135,    48,   -79,   487,
+      48,    48,    48,    48,    48,    48,    48,    48,    48,    48,
+     138,   137,   255,   -79,   -79,   -79,    54,    18,   -79,    62,
+      48,    48,    48,   396,   -79,   -79,   283,   620,   140,   -79,
+      51,   -79,   -79,   -79,   599,    95,   434,   497,   -79,    76,
+      76,   -79,   -79,    81,    81,    81,    81,    81,    81,    48,
+     -79,   141,   -79,   174,   106,   146,   528,   538,   548,   148,
+     150,   -79,   -79,    62,   632,    48,   -79,   147,   -79,   444,
+     -79,   -79,   182,   184,   185,   173,   170,    48,    48,   194,
+     -79,   599,    48,   -79,   -79,   -79,   -79,   368,   368,   579,
+     589,   -79,   477,   143,   312,    14,   196,   -79,   368,   201,
+     202,   -79,   -79,   340,   -79,   -79,   204,   -79
 };
 
   /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -645,61 +689,243 @@ static const yytype_int8 yypact[] =
      means the default is an error.  */
 static const yytype_int8 yydefact[] =
 {
-       0,     0,     0,     7,     8,     3,     0,     5,     0,     1,
-       2,     4,    15,     0,    12,     6,     0,     0,     9,     0,
-       0,    13,     0,     0,    10,     0,     0,    14,     0,    11
+       0,     0,     0,     0,     0,     4,     0,     0,    28,    29,
+       6,     0,     8,    14,     1,    28,     0,    20,     0,     0,
+       3,     0,     0,     5,     7,    16,     0,     0,    11,    12,
+      19,     2,     0,     0,     0,     0,    32,     0,     0,    16,
+      15,     9,    14,     0,     0,    34,     0,     0,    36,     0,
+       0,    25,     0,    76,    85,    78,     0,     0,     0,    77,
+      10,     0,     0,    40,     0,     0,    39,    33,    35,    85,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,    43,    44,    45,    46,    47,    48,    49,    50,     0,
+       0,    13,    26,     0,     0,     0,    85,     0,    83,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+      17,     0,     0,    23,    41,    37,     0,     0,    31,     0,
+       0,     0,     0,     0,    51,    52,     0,     0,     0,    42,
+       0,    24,    27,    79,    82,     0,     0,     0,    75,    65,
+      66,    67,    68,    69,    70,    71,    72,    73,    74,     0,
+      22,     0,    38,     0,     0,     0,     0,     0,     0,     0,
+       0,    55,    30,     0,     0,     0,    80,    86,    84,     0,
+      21,    53,     0,     0,     0,     0,     0,     0,     0,     0,
+      58,    81,     0,    18,    54,    56,    57,     0,     0,     0,
+       0,    59,     0,     0,     0,     0,     0,    87,     0,     0,
+       0,    63,    64,     0,    61,    62,     0,    60
 };
 
   /* YYPGOTO[NTERM-NUM].  */
-static const yytype_int8 yypgoto[] =
+static const yytype_int16 yypgoto[] =
 {
-     -33,   -33,   -33,    17,   -33,   -33,     6
+     -79,   -79,   -79,   -79,   198,   -79,   175,   189,   -79,   200,
+     -79,   176,   128,     2,    11,   -79,   187,   -79,   177,   -79,
+     110,   -58,   -78,   -79,   -79,   -79,   -79,   -79,   -79,   -79,
+     -22,   105,   -49
 };
 
   /* YYDEFGOTO[NTERM-NUM].  */
-static const yytype_int8 yydefgoto[] =
+static const yytype_int16 yydefgoto[] =
 {
-      -1,     2,     6,     7,     8,    13,    14
+      -1,     3,     4,    11,    12,    27,    28,    29,    16,    17,
+      18,    50,    51,    52,     5,     6,    35,    47,    48,    65,
+      66,    80,    81,    82,    83,    84,    85,    86,    87,    88,
+     134,   135,    59
 };
 
   /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
      positive, shift that token.  If negative, reduce the rule whose
      number is the opposite.  If YYTABLE_NINF, syntax error.  */
-static const yytype_int8 yytable[] =
+static const yytype_uint8 yytable[] =
 {
-      15,     3,     4,     1,     5,     3,     4,     9,    10,    12,
-      21,    17,    19,    20,    22,    23,    25,    24,    26,    28,
-      27,    29,    18,    11,     0,     0,     0,    16
+      89,    96,   129,   112,    13,     7,    19,    98,    53,    54,
+      55,    56,    89,    13,    41,    20,    58,   123,    19,    56,
+     126,    53,    54,    55,   201,    14,    89,    31,    21,    89,
+      25,    89,    56,    39,   129,    99,    46,   115,    97,     1,
+      26,     2,   188,    26,    42,   129,    57,   133,   129,    46,
+      22,    53,    54,    55,    53,    54,    55,   127,    63,    57,
+     153,    92,    56,    89,    32,    56,    96,   116,    64,    33,
+     155,    93,    34,   136,    89,   137,    56,    89,   139,   140,
+     141,   142,   143,   144,   145,   146,   147,   148,   163,    57,
+     102,   103,    57,   100,   101,   102,   103,    36,   156,   157,
+     158,     8,     9,    90,    10,    91,     8,     9,   164,    23,
+       8,     9,    44,    45,   179,   129,   129,     8,     9,    37,
+      67,    38,    15,     9,    94,   129,    95,   169,    49,   193,
+     194,    90,    61,   113,   117,   165,    95,   166,    89,    89,
+     203,     8,     9,   181,    89,    89,   165,    69,   172,    89,
+      38,    71,    72,   114,    89,   189,   190,    56,   118,   119,
+     192,   120,   124,   121,   122,    73,   125,   198,   199,    74,
+     130,    75,    76,    77,    78,    69,   132,    70,    95,    71,
+      72,   149,    79,   150,   171,    56,   162,   170,   173,   177,
+     182,   178,   184,    73,   185,   186,   187,    74,   188,    75,
+      76,    77,    78,    69,   191,   111,   202,    71,    72,    24,
+      79,   204,   205,    56,   207,    40,    30,    60,   131,    43,
+      62,    73,   154,     0,    68,    74,   152,    75,    76,    77,
+      78,    69,     0,   128,     0,    71,    72,     0,    79,     0,
+       0,    56,     0,     0,     0,     0,     0,     0,     0,    73,
+       0,     0,     0,    74,     0,    75,    76,    77,    78,    69,
+       0,   151,     0,    71,    72,     0,    79,     0,     0,    56,
+       0,     0,     0,     0,     0,     0,     0,    73,     0,     0,
+       0,    74,     0,    75,    76,    77,    78,    69,     0,     0,
+       0,    71,    72,     0,    79,     0,     0,    56,     0,     0,
+       0,     0,     0,     0,     0,    73,     0,     0,     0,    74,
+       0,    75,    76,    77,    78,   160,    69,     0,     0,     0,
+      71,    72,    79,     0,     0,     0,    56,     0,     0,     0,
+       0,     0,     0,     0,    73,     0,     0,     0,    74,   200,
+      75,    76,    77,    78,    69,     0,     0,     0,    71,    72,
+       0,    79,     0,     0,    56,     0,     0,     0,     0,     0,
+       0,     0,    73,     0,     0,   206,    74,     0,    75,    76,
+      77,    78,    69,     0,     0,     0,    71,    72,     0,    79,
+       0,     0,    56,     0,     0,     0,     0,     0,     0,     0,
+      73,     0,     0,     0,    74,     0,    75,    76,    77,    78,
+      69,     0,     0,     0,    71,    72,     0,    79,     0,     0,
+      56,     0,     0,     0,     0,     0,     0,     0,    73,     0,
+       0,     0,   159,     0,    75,    76,    77,    78,     0,     0,
+       0,     0,     0,     0,     0,    79,   100,   101,   102,   103,
+     104,   105,   106,   107,   108,   109,   100,   101,   102,   103,
+     104,   105,   106,   107,   108,   109,   100,   101,   102,   103,
+     104,   105,   106,   107,   108,   109,     0,     0,   110,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,   167,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,   183,   100,
+     101,   102,   103,   104,   105,   106,   107,   108,   109,   100,
+     101,   102,   103,   104,   105,   106,   107,   108,   109,   100,
+     101,   102,   103,   104,   105,   106,   107,   108,   109,     0,
+       0,   197,     0,     0,     0,     0,     0,     0,     0,   138,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,   168,
+     100,   101,   102,   103,   104,   105,   106,   107,   108,   109,
+     100,   101,   102,   103,   104,   105,   106,   107,   108,   109,
+     100,   101,   102,   103,   104,   105,   106,   107,   108,   109,
+     174,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+     175,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+     176,   100,   101,   102,   103,   104,   105,   106,   107,   108,
+     109,   100,   101,   102,   103,   104,   105,   106,   107,   108,
+     109,   100,   101,   102,   103,   104,   105,   106,   107,   108,
+     109,   195,     0,     0,     0,     0,     0,     0,     0,     0,
+     161,   196,   100,   101,   102,   103,   104,   105,   106,   107,
+     108,   109,   180,     0,   100,   101,   102,   103,   104,   105,
+     106,   107,   108,   109
 };
 
-static const yytype_int8 yycheck[] =
+static const yytype_int16 yycheck[] =
 {
-      10,    33,    34,    35,    36,    33,    34,     0,    36,     4,
-      39,    38,     3,    38,     3,    38,     3,    39,    38,     3,
-      39,    39,    16,     6,    -1,    -1,    -1,    37
+      49,     4,    80,    61,     2,    38,     4,    56,     3,     4,
+       5,    14,    61,    11,    10,     4,    38,    75,    16,    14,
+      78,     3,     4,     5,    10,     0,    75,    16,    45,    78,
+       4,    80,    14,     4,   112,    57,    34,    10,    41,    33,
+      14,    35,    28,    14,    40,   123,    41,    42,   126,    47,
+      41,     3,     4,     5,     3,     4,     5,    79,     4,    41,
+      42,     4,    14,   112,    45,    14,     4,    40,    14,     4,
+     119,    14,    35,    95,   123,    97,    14,   126,   100,   101,
+     102,   103,   104,   105,   106,   107,   108,   109,    37,    41,
+      14,    15,    41,    12,    13,    14,    15,    42,   120,   121,
+     122,    33,    34,    40,    36,    42,    33,    34,   130,    36,
+      33,    34,    41,    36,   163,   193,   194,    33,    34,    41,
+      36,    43,    33,    34,    41,   203,    43,   149,     7,   187,
+     188,    40,     7,    42,    41,    40,    43,    42,   187,   188,
+     198,    33,    34,   165,   193,   194,    40,     4,    42,   198,
+      43,     8,     9,     4,   203,   177,   178,    14,    46,    41,
+     182,    41,    10,    41,    41,    22,    10,    24,    25,    26,
+      11,    28,    29,    30,    31,     4,     4,     6,    43,     8,
+       9,    43,    39,    46,    10,    14,    46,    46,    42,    41,
+      43,    41,    10,    22,    10,    10,    23,    26,    28,    28,
+      29,    30,    31,     4,    10,     6,    10,     8,     9,    11,
+      39,    10,    10,    14,    10,    26,    16,    42,    90,    32,
+      44,    22,   117,    -1,    47,    26,   116,    28,    29,    30,
+      31,     4,    -1,     6,    -1,     8,     9,    -1,    39,    -1,
+      -1,    14,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    22,
+      -1,    -1,    -1,    26,    -1,    28,    29,    30,    31,     4,
+      -1,     6,    -1,     8,     9,    -1,    39,    -1,    -1,    14,
+      -1,    -1,    -1,    -1,    -1,    -1,    -1,    22,    -1,    -1,
+      -1,    26,    -1,    28,    29,    30,    31,     4,    -1,    -1,
+      -1,     8,     9,    -1,    39,    -1,    -1,    14,    -1,    -1,
+      -1,    -1,    -1,    -1,    -1,    22,    -1,    -1,    -1,    26,
+      -1,    28,    29,    30,    31,    32,     4,    -1,    -1,    -1,
+       8,     9,    39,    -1,    -1,    -1,    14,    -1,    -1,    -1,
+      -1,    -1,    -1,    -1,    22,    -1,    -1,    -1,    26,    27,
+      28,    29,    30,    31,     4,    -1,    -1,    -1,     8,     9,
+      -1,    39,    -1,    -1,    14,    -1,    -1,    -1,    -1,    -1,
+      -1,    -1,    22,    -1,    -1,    25,    26,    -1,    28,    29,
+      30,    31,     4,    -1,    -1,    -1,     8,     9,    -1,    39,
+      -1,    -1,    14,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
+      22,    -1,    -1,    -1,    26,    -1,    28,    29,    30,    31,
+       4,    -1,    -1,    -1,     8,     9,    -1,    39,    -1,    -1,
+      14,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    22,    -1,
+      -1,    -1,    26,    -1,    28,    29,    30,    31,    -1,    -1,
+      -1,    -1,    -1,    -1,    -1,    39,    12,    13,    14,    15,
+      16,    17,    18,    19,    20,    21,    12,    13,    14,    15,
+      16,    17,    18,    19,    20,    21,    12,    13,    14,    15,
+      16,    17,    18,    19,    20,    21,    -1,    -1,    44,    -1,
+      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    44,    -1,
+      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    44,    12,
+      13,    14,    15,    16,    17,    18,    19,    20,    21,    12,
+      13,    14,    15,    16,    17,    18,    19,    20,    21,    12,
+      13,    14,    15,    16,    17,    18,    19,    20,    21,    -1,
+      -1,    44,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    42,
+      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    42,
+      12,    13,    14,    15,    16,    17,    18,    19,    20,    21,
+      12,    13,    14,    15,    16,    17,    18,    19,    20,    21,
+      12,    13,    14,    15,    16,    17,    18,    19,    20,    21,
+      42,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
+      42,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
+      42,    12,    13,    14,    15,    16,    17,    18,    19,    20,
+      21,    12,    13,    14,    15,    16,    17,    18,    19,    20,
+      21,    12,    13,    14,    15,    16,    17,    18,    19,    20,
+      21,    42,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
+      10,    42,    12,    13,    14,    15,    16,    17,    18,    19,
+      20,    21,    10,    -1,    12,    13,    14,    15,    16,    17,
+      18,    19,    20,    21
 };
 
   /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
      symbol of state STATE-NUM.  */
 static const yytype_int8 yystos[] =
 {
-       0,    35,    43,    33,    34,    36,    44,    45,    46,     0,
-      36,    45,     4,    47,    48,    10,    37,    38,    48,     3,
-      38,    39,     3,    38,    39,     3,    38,    39,     3,    39
+       0,    33,    35,    48,    49,    61,    62,    38,    33,    34,
+      36,    50,    51,    60,     0,    33,    55,    56,    57,    60,
+      61,    45,    41,    36,    51,     4,    14,    52,    53,    54,
+      56,    61,    45,     4,    35,    63,    42,    41,    43,     4,
+      54,    10,    40,    63,    41,    36,    60,    64,    65,     7,
+      58,    59,    60,     3,     4,     5,    14,    41,    77,    79,
+      53,     7,    58,     4,    14,    66,    67,    36,    65,     4,
+       6,     8,     9,    22,    26,    28,    29,    30,    31,    39,
+      68,    69,    70,    71,    72,    73,    74,    75,    76,    79,
+      40,    42,     4,    14,    41,    43,     4,    41,    79,    77,
+      12,    13,    14,    15,    16,    17,    18,    19,    20,    21,
+      44,     6,    68,    42,     4,    10,    40,    41,    46,    41,
+      41,    41,    41,    68,    10,    10,    68,    77,     6,    69,
+      11,    59,     4,    42,    77,    78,    77,    77,    42,    77,
+      77,    77,    77,    77,    77,    77,    77,    77,    77,    43,
+      46,     6,    67,    42,    78,    79,    77,    77,    77,    26,
+      32,    10,    46,    37,    77,    40,    42,    44,    42,    77,
+      46,    10,    42,    42,    42,    42,    42,    41,    41,    79,
+      10,    77,    43,    44,    10,    10,    10,    23,    28,    77,
+      77,    10,    77,    68,    68,    42,    42,    44,    24,    25,
+      27,    10,    10,    68,    10,    10,    25,    10
 };
 
   /* YYR1[YYN] -- Symbol number of symbol that rule YYN derives.  */
 static const yytype_int8 yyr1[] =
 {
-       0,    42,    43,    43,    44,    44,    45,    46,    46,    47,
-      47,    47,    47,    47,    47,    48
+       0,    47,    48,    48,    48,    49,    49,    50,    50,    51,
+      52,    52,    53,    53,    53,    54,    54,    54,    54,    55,
+      55,    56,    56,    57,    58,    58,    59,    59,    60,    60,
+      61,    61,    62,    63,    63,    64,    64,    65,    66,    66,
+      67,    67,    68,    68,    69,    69,    69,    69,    69,    69,
+      69,    69,    69,    69,    69,    69,    70,    71,    72,    72,
+      73,    73,    74,    75,    76,    77,    77,    77,    77,    77,
+      77,    77,    77,    77,    77,    77,    77,    77,    77,    77,
+      77,    78,    78,    79,    79,    79,    79,    79
 };
 
   /* YYR2[YYN] -- Number of symbols on the right hand side of rule YYN.  */
 static const yytype_int8 yyr2[] =
 {
-       0,     2,     3,     2,     2,     1,     3,     1,     1,     3,
-       6,     9,     1,     4,     7,     1
+       0,     2,     3,     2,     1,     3,     2,     2,     1,     3,
+       3,     1,     1,     4,     0,     2,     1,     4,     7,     2,
+       1,     7,     6,     5,     3,     1,     2,     3,     1,     1,
+       7,     6,     4,     3,     2,     2,     1,     3,     3,     1,
+       1,     2,     2,     1,     1,     1,     1,     1,     1,     1,
+       1,     2,     2,     4,     5,     3,     5,     5,     4,     5,
+      10,     8,     8,     7,     7,     3,     3,     3,     3,     3,
+       3,     3,     3,     3,     3,     3,     1,     1,     1,     3,
+       4,     3,     1,     2,     4,     1,     4,     7
 };
 
 
@@ -1395,115 +1621,626 @@ yyreduce:
   switch (yyn)
     {
   case 2:
-#line 63 "exprtree.y"
-                                     {
-      struct gsymbol* top = gst->top;
-      while(top){
-        top->binding = (gst->binding);
-        gst->binding += top->size;
-        top = top->next;
-      }
+#line 60 "exprtree.y"
+                                         {
       printGlobalSymbolTable();
+      printLocalSymbolTable();
+
+      // Printing expression tree
+      // printf("\nPrinting function def block\n");
+      // printPrefix($2);
+      // printf("\nPrinting mainblock\n");
+      // printPrefix($3);
+
+      {(yyval.no) = createTree(noNumber,voidType,NULL,emptyNode,(yyvsp[-1].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+
+      // Call codegen
+      helperFunction((yyval.no));
     }
-#line 1409 "y.tab.c"
+#line 1641 "y.tab.c"
     break;
 
   case 3:
-#line 72 "exprtree.y"
-                 {}
-#line 1415 "y.tab.c"
+#line 75 "exprtree.y"
+                         {
+      printGlobalSymbolTable();
+      printLocalSymbolTable();
+      printf("\n");
+      // printPrefix($2);
+      (yyval.no) = createTree(noNumber,voidType,NULL,emptyNode,(yyvsp[0].no),NULL,NULL,NULL,NULL,NULL);  
+
+      // Call codegen
+      helperFunction((yyval.no));
+    }
+#line 1656 "y.tab.c"
     break;
 
   case 4:
-#line 75 "exprtree.y"
-                         {}
-#line 1421 "y.tab.c"
+#line 85 "exprtree.y"
+              {
+      (yyval.no) = createTree(noNumber,voidType,NULL,emptyNode,(yyvsp[0].no),NULL,NULL,NULL,NULL,NULL);
+      // Call codegen
+      helperFunction((yyval.no));  
+    }
+#line 1666 "y.tab.c"
     break;
 
   case 5:
-#line 76 "exprtree.y"
-         {}
-#line 1427 "y.tab.c"
-    break;
-
-  case 6:
-#line 79 "exprtree.y"
-                              {
-    struct gsymbol* top = gst->top;
-    while((top)&&(top->type == -1)){
-      top->type = (yyvsp[-2].num);
-      top=top->next;
+#line 92 "exprtree.y"
+                                    {
+      // Binding of variables   
+      struct gsymbol* top = gst->top;
+      while(top){
+        if(top->flabel == -1){
+          top->binding = binding+1;
+          binding += top->size;
+        }
+        top = top->next;
+      }
     }
-  }
-#line 1439 "y.tab.c"
-    break;
-
-  case 7:
-#line 88 "exprtree.y"
-            {(yyval.num) = intType;}
-#line 1445 "y.tab.c"
-    break;
-
-  case 8:
-#line 89 "exprtree.y"
-        {(yyval.num) = strType;}
-#line 1451 "y.tab.c"
+#line 1682 "y.tab.c"
     break;
 
   case 9:
-#line 92 "exprtree.y"
-                             {install((yyvsp[0].str),-1,1,0);}
-#line 1457 "y.tab.c"
-    break;
-
-  case 10:
-#line 93 "exprtree.y"
-                                   {install((yyvsp[-3].str),-1,(yyvsp[-1].no)->val,0);}
-#line 1463 "y.tab.c"
-    break;
-
-  case 11:
-#line 94 "exprtree.y"
-                                               {
-      int val1 =  ((yyvsp[-4].no)->val); int val2 = ((yyvsp[-1].no)->val);
-      int size = val1*val2; 
-      install((yyvsp[-6].str),-1,size,(yyvsp[-1].no)->val);
+#line 111 "exprtree.y"
+                               {
+      // Adding type of variables for the entries in global symbol table
+      struct gsymbol* top = gst->top;
+      while(top){
+        if(top->type == undefined){
+          if(top->ispointer)  top->type = ((yyvsp[-2].num) == intType) ? intPtrType : strPtrType;
+          else  top->type = (yyvsp[-2].num);
+        }
+        top = top->next;
+      }
     }
-#line 1473 "y.tab.c"
-    break;
-
-  case 12:
-#line 99 "exprtree.y"
-           {install((yyvsp[0].str),-1,1,0);}
-#line 1479 "y.tab.c"
+#line 1698 "y.tab.c"
     break;
 
   case 13:
-#line 100 "exprtree.y"
-                       {install((yyvsp[-3].str),-1,(yyvsp[-1].no)->val,0);}
-#line 1485 "y.tab.c"
-    break;
-
-  case 14:
-#line 101 "exprtree.y"
-                                   {
-      int val1 =  ((yyvsp[-4].no)->val); int val2 = ((yyvsp[-1].no)->val);
-      int size = val1*val2;
-      install((yyvsp[-6].str),-1,size,(yyvsp[-1].no)->val);
+#line 130 "exprtree.y"
+                         {
+      // Making an entry in gst for function and also assigning label for that function.
+      gInstall((yyvsp[-3].str),undefined,0,0,0,(yyvsp[-1].pl));
+      struct gsymbol* node = gLookup((yyvsp[-3].str));
+      node->flabel = ++fLabel;
     }
-#line 1495 "y.tab.c"
+#line 1709 "y.tab.c"
     break;
 
   case 15:
-#line 108 "exprtree.y"
-            {
-      (yyval.str) = (yyvsp[0].str);
+#line 140 "exprtree.y"
+                                      {
+      struct gsymbol* node = gLookup((yyvsp[0].str));
+      node->ispointer = 1;
     }
-#line 1503 "y.tab.c"
+#line 1718 "y.tab.c"
+    break;
+
+  case 16:
+#line 144 "exprtree.y"
+        {gInstall((yyvsp[0].str),undefined,0,0,0,NULL); (yyval.str) = (yyvsp[0].str);}
+#line 1724 "y.tab.c"
+    break;
+
+  case 17:
+#line 145 "exprtree.y"
+                    {gInstall((yyvsp[-3].str),undefined,0,(yyvsp[-1].no)->val,0,NULL); (yyval.str) = (yyvsp[-3].str);}
+#line 1730 "y.tab.c"
+    break;
+
+  case 18:
+#line 146 "exprtree.y"
+                                 {gInstall((yyvsp[-6].str),undefined,0,(yyvsp[-4].no)->val,(yyvsp[-1].no)->val,NULL); (yyval.str) = (yyvsp[-6].str);}
+#line 1736 "y.tab.c"
+    break;
+
+  case 19:
+#line 150 "exprtree.y"
+                           {(yyval.no) = createTree(noNumber,voidType,NULL,emptyNode,(yyvsp[-1].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 1742 "y.tab.c"
+    break;
+
+  case 20:
+#line 151 "exprtree.y"
+         {(yyval.no) = (yyvsp[0].no);}
+#line 1748 "y.tab.c"
+    break;
+
+  case 21:
+#line 154 "exprtree.y"
+                                              {(yyval.no) = createFunkNode((yyvsp[-6].str),(yyvsp[-2].no));}
+#line 1754 "y.tab.c"
+    break;
+
+  case 22:
+#line 155 "exprtree.y"
+                                       {(yyval.no) = NULL;}
+#line 1760 "y.tab.c"
+    break;
+
+  case 23:
+#line 159 "exprtree.y"
+                                  {
+      // Finding the function entry from global symbol table
+      struct gsymbol* node = gLookup((yyvsp[-3].str));
+
+      // Compare the function declaration with initialization to ensure that both of them are equal
+      if(!node) yyerror("Make sure to initialize the function %s\n",(yyvsp[-3].str));
+      if(node->type != (yyvsp[-4].num)) yyerror("Return type mismatch between initialization and declaration of function %s\n",(yyvsp[-3].str));
+      
+      // spl -- Stored param list
+      // npl -- New param list
+      // Both of the list should exactly match
+      struct paramList* spl = node->plist;
+      struct paramList* npl = (yyvsp[-1].pl);
+      while(spl || npl){
+        if((!spl)||(!npl)) yyerror("No of parameter of declaration and initialization does not match");
+        if((strcmp(spl->name,npl->name)!=0)||(spl->type != npl->type))
+          yyerror("parameters mismatch between declaration and initialization");
+        spl = spl->next;
+        npl = npl->next;
+      }
+
+      // Adding this list of parameters to the local symbol table of this function.
+      struct paramList* pl = (yyvsp[-1].pl);
+        while(pl){
+          struct lsymbol* temp = makeLSymbolNode(pl->name, pl->type, -1);
+          temp->next = node->ltop;
+          node->ltop = temp;
+          pl = pl->next;
+        }
+
+      // Return function name
+      (yyval.str) = (yyvsp[-3].str);      
+    }
+#line 1798 "y.tab.c"
+    break;
+
+  case 24:
+#line 194 "exprtree.y"
+                                {(yyvsp[0].pl)->next = (yyvsp[-2].pl); (yyval.pl) = (yyvsp[0].pl);}
+#line 1804 "y.tab.c"
+    break;
+
+  case 25:
+#line 195 "exprtree.y"
+          {(yyval.pl) = (yyvsp[0].pl);}
+#line 1810 "y.tab.c"
+    break;
+
+  case 26:
+#line 199 "exprtree.y"
+                {(yyval.pl) = makeParamNode((yyvsp[-1].num),(yyvsp[0].str),0);}
+#line 1816 "y.tab.c"
+    break;
+
+  case 27:
+#line 200 "exprtree.y"
+                  {(yyval.pl) = makeParamNode((yyvsp[-2].num),(yyvsp[0].str),1);}
+#line 1822 "y.tab.c"
+    break;
+
+  case 28:
+#line 203 "exprtree.y"
+           {(yyval.num) = intType;}
+#line 1828 "y.tab.c"
+    break;
+
+  case 29:
+#line 204 "exprtree.y"
+        {(yyval.num) = strType;}
+#line 1834 "y.tab.c"
+    break;
+
+  case 30:
+#line 209 "exprtree.y"
+                                                        {
+      // Make an connector node and return that node
+      (yyval.no) = createMainNode((yyvsp[-6].str),(yyvsp[-2].no));
+    }
+#line 1843 "y.tab.c"
+    break;
+
+  case 31:
+#line 213 "exprtree.y"
+                                          {}
+#line 1849 "y.tab.c"
+    break;
+
+  case 32:
+#line 216 "exprtree.y"
+                              {
+      char* temp = malloc(5);
+      memcpy(temp, "main\0", 5);
+
+      gInstall(temp,intType,0,0,0,NULL);
+      struct gsymbol* node = gLookup(temp);
+      node->ltop = NULL;
+      node->flabel = ++fLabel;
+
+      (yyval.str) = temp;
+    }
+#line 1865 "y.tab.c"
+    break;
+
+  case 33:
+#line 230 "exprtree.y"
+                                    {
+      char* funkName = (yyvsp[(-1) - (3)].str);
+
+      // Joining this local symbol table to the (ltop field of gsymbol)
+      struct gsymbol* gnode = gLookup(funkName);
+      struct lsymbol* top = (yyvsp[-1].lnode);
+
+      while(top->next) top=top->next;
+      top->next = gnode->ltop;
+      gnode->ltop = (yyvsp[-1].lnode);
+
+      // initializing lst value to current local symbol table for making an expression tree
+      lst->top = (yyvsp[-1].lnode);
+      lst->name = funkName;
+    }
+#line 1885 "y.tab.c"
+    break;
+
+  case 34:
+#line 245 "exprtree.y"
+                 {
+      char* funkName = (yyvsp[(-1) - (2)].str);
+      struct gsymbol* gnode = gLookup(funkName);
+      lst->top = gnode->ltop;
+      lst->name = funkName;
+    }
+#line 1896 "y.tab.c"
+    break;
+
+  case 35:
+#line 253 "exprtree.y"
+                            {
+      // Both lDeclList and lDecl contains the pointer to head of the linked list of lsymbol node
+      struct lsymbol* l1 = (yyvsp[-1].lnode);
+      struct lsymbol* l2 = (yyvsp[0].lnode);
+
+      // Get the last node of list2
+      while(l2->next) l2 = l2->next;
+      l2->next = l1;
+      (yyval.lnode) = (yyvsp[0].lnode);
+    }
+#line 1911 "y.tab.c"
+    break;
+
+  case 36:
+#line 263 "exprtree.y"
+          {(yyval.lnode) = (yyvsp[0].lnode);}
+#line 1917 "y.tab.c"
+    break;
+
+  case 37:
+#line 266 "exprtree.y"
+                               {
+      struct lsymbol* top = (yyvsp[-1].lnode);
+      while(top){
+        if(top->type == undefined){
+          if(top->ispointer) top->type = ((yyvsp[-2].num) == intType) ? intPtrType : strPtrType;
+          else top->type = (yyvsp[-2].num);
+        }
+        top = top->next;
+      }
+      (yyval.lnode) = (yyvsp[-1].lnode);
+    }
+#line 1933 "y.tab.c"
+    break;
+
+  case 38:
+#line 279 "exprtree.y"
+                          {(yyvsp[0].lnode)->next = (yyvsp[-2].lnode); (yyval.lnode) = (yyvsp[0].lnode);}
+#line 1939 "y.tab.c"
+    break;
+
+  case 39:
+#line 280 "exprtree.y"
+        {(yyval.lnode) = (yyvsp[0].lnode);}
+#line 1945 "y.tab.c"
+    break;
+
+  case 40:
+#line 284 "exprtree.y"
+         {(yyval.lnode) = makeLSymbolNode((yyvsp[0].str),undefined,0);}
+#line 1951 "y.tab.c"
+    break;
+
+  case 41:
+#line 285 "exprtree.y"
+            {(yyval.lnode) = makeLSymbolNode((yyvsp[0].str),undefined,1);}
+#line 1957 "y.tab.c"
+    break;
+
+  case 42:
+#line 290 "exprtree.y"
+                   {(yyval.no) = createTree(noNumber,voidType,NULL,emptyNode,(yyvsp[-1].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 1963 "y.tab.c"
+    break;
+
+  case 43:
+#line 291 "exprtree.y"
+         {(yyval.no) = (yyvsp[0].no);}
+#line 1969 "y.tab.c"
+    break;
+
+  case 44:
+#line 294 "exprtree.y"
+                 {(yyval.no) = (yyvsp[0].no);}
+#line 1975 "y.tab.c"
+    break;
+
+  case 45:
+#line 295 "exprtree.y"
+               {(yyval.no) = (yyvsp[0].no);}
+#line 1981 "y.tab.c"
+    break;
+
+  case 46:
+#line 296 "exprtree.y"
+               {(yyval.no) = (yyvsp[0].no);}
+#line 1987 "y.tab.c"
+    break;
+
+  case 47:
+#line 297 "exprtree.y"
+           {(yyval.no) = (yyvsp[0].no);}
+#line 1993 "y.tab.c"
+    break;
+
+  case 48:
+#line 298 "exprtree.y"
+              {(yyval.no) = (yyvsp[0].no);}
+#line 1999 "y.tab.c"
+    break;
+
+  case 49:
+#line 299 "exprtree.y"
+                {(yyval.no) = (yyvsp[0].no);}
+#line 2005 "y.tab.c"
+    break;
+
+  case 50:
+#line 300 "exprtree.y"
+                    {(yyval.no) = (yyvsp[0].no);}
+#line 2011 "y.tab.c"
+    break;
+
+  case 51:
+#line 301 "exprtree.y"
+                    {(yyval.no) = createTree(noNumber,voidType,NULL,breakNode,NULL,NULL,NULL,NULL,NULL,NULL);}
+#line 2017 "y.tab.c"
+    break;
+
+  case 52:
+#line 302 "exprtree.y"
+                       {(yyval.no) = createTree(noNumber,voidType,NULL,continueNode,NULL,NULL,NULL,NULL,NULL,NULL);}
+#line 2023 "y.tab.c"
+    break;
+
+  case 53:
+#line 303 "exprtree.y"
+                         {(yyval.no) = createCallerNode((yyvsp[-3].str),NULL);}
+#line 2029 "y.tab.c"
+    break;
+
+  case 54:
+#line 304 "exprtree.y"
+                                 {(yyval.no) = createCallerNode((yyvsp[-4].str),(yyvsp[-2].no));}
+#line 2035 "y.tab.c"
+    break;
+
+  case 55:
+#line 305 "exprtree.y"
+                          {(yyval.no) = createReturnNode(lst->name,(yyvsp[-1].no));}
+#line 2041 "y.tab.c"
+    break;
+
+  case 56:
+#line 308 "exprtree.y"
+                                              {(yyval.no) = createTree(noNumber,voidType,NULL,readNode,(yyvsp[-2].no),NULL,NULL,NULL,NULL,NULL);}
+#line 2047 "y.tab.c"
+    break;
+
+  case 57:
+#line 311 "exprtree.y"
+                                          {(yyval.no) = createTree(noNumber,voidType,NULL,writeNode,(yyvsp[-2].no),NULL,NULL,NULL,NULL,NULL);}
+#line 2053 "y.tab.c"
+    break;
+
+  case 58:
+#line 314 "exprtree.y"
+                                              {(yyval.no) = createTree(noNumber,voidType,NULL,assignNode,(yyvsp[-3].no),(yyvsp[-1].no),NULL,NULL,NULL,NULL);}
+#line 2059 "y.tab.c"
+    break;
+
+  case 59:
+#line 315 "exprtree.y"
+                                                {
+      struct tnode* newAddrNode = createAddrNode((yyvsp[-1].no));
+      (yyval.no) = createTree(noNumber,voidType,NULL,assignNode,(yyvsp[-4].no),newAddrNode,NULL,NULL,NULL,NULL);
+    }
+#line 2068 "y.tab.c"
+    break;
+
+  case 60:
+#line 321 "exprtree.y"
+                                                               {(yyval.no) = createTree(noNumber,voidType,NULL,ifElseNode,(yyvsp[-4].no),(yyvsp[-2].no),(yyvsp[-7].no),NULL,NULL,NULL);}
+#line 2074 "y.tab.c"
+    break;
+
+  case 61:
+#line 322 "exprtree.y"
+                                               {(yyval.no) = createTree(noNumber,voidType,NULL,ifElseNode,(yyvsp[-2].no),NULL,(yyvsp[-5].no),NULL,NULL,NULL);}
+#line 2080 "y.tab.c"
+    break;
+
+  case 62:
+#line 325 "exprtree.y"
+                                                            {(yyval.no) = createTree(noNumber,voidType,NULL,whileNode,(yyvsp[-2].no),NULL,(yyvsp[-5].no),NULL,NULL,NULL);}
+#line 2086 "y.tab.c"
+    break;
+
+  case 63:
+#line 328 "exprtree.y"
+                                                    {(yyval.no) = createTree(noNumber,voidType,NULL,doWhileNode,(yyvsp[-5].no),NULL,(yyvsp[-2].no),NULL,NULL,NULL);}
+#line 2092 "y.tab.c"
+    break;
+
+  case 64:
+#line 331 "exprtree.y"
+                                                            {(yyval.no) = createTree(noNumber,voidType,NULL,repeatUntilNode,(yyvsp[-5].no),NULL,(yyvsp[-2].no),NULL,NULL,NULL);}
+#line 2098 "y.tab.c"
+    break;
+
+  case 65:
+#line 335 "exprtree.y"
+                       {(yyval.no) = createTree(noNumber,intType,NULL,addNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2104 "y.tab.c"
+    break;
+
+  case 66:
+#line 336 "exprtree.y"
+                      {(yyval.no) = createTree(noNumber,intType,NULL,subNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2110 "y.tab.c"
+    break;
+
+  case 67:
+#line 337 "exprtree.y"
+                   {(yyval.no) = createTree(noNumber,intType,NULL,mulNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2116 "y.tab.c"
+    break;
+
+  case 68:
+#line 338 "exprtree.y"
+                  {(yyval.no) = createTree(noNumber,intType,NULL,divNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2122 "y.tab.c"
+    break;
+
+  case 69:
+#line 339 "exprtree.y"
+                 {(yyval.no) = createTree(noNumber,boolType,NULL,lessNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2128 "y.tab.c"
+    break;
+
+  case 70:
+#line 340 "exprtree.y"
+                 {(yyval.no) = createTree(noNumber,boolType,NULL,greaterNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2134 "y.tab.c"
+    break;
+
+  case 71:
+#line 341 "exprtree.y"
+                 {(yyval.no) = createTree(noNumber,boolType,NULL,lessEqualNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2140 "y.tab.c"
+    break;
+
+  case 72:
+#line 342 "exprtree.y"
+                 {(yyval.no) = createTree(noNumber,boolType,NULL,greaterEqualNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2146 "y.tab.c"
+    break;
+
+  case 73:
+#line 343 "exprtree.y"
+                 {(yyval.no) = createTree(noNumber,boolType,NULL,notEqualNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2152 "y.tab.c"
+    break;
+
+  case 74:
+#line 344 "exprtree.y"
+                 {(yyval.no) = createTree(noNumber,boolType,NULL,equalNode,(yyvsp[-2].no),(yyvsp[0].no),NULL,NULL,NULL,NULL);}
+#line 2158 "y.tab.c"
+    break;
+
+  case 75:
+#line 345 "exprtree.y"
+                 {(yyval.no) = (yyvsp[-1].no);}
+#line 2164 "y.tab.c"
+    break;
+
+  case 76:
+#line 346 "exprtree.y"
+        {(yyval.no) = (yyvsp[0].no);}
+#line 2170 "y.tab.c"
+    break;
+
+  case 77:
+#line 347 "exprtree.y"
+               {(yyval.no) = (yyvsp[0].no);}
+#line 2176 "y.tab.c"
+    break;
+
+  case 78:
+#line 348 "exprtree.y"
+           {(yyval.no) = (yyvsp[0].no);}
+#line 2182 "y.tab.c"
+    break;
+
+  case 79:
+#line 349 "exprtree.y"
+               {(yyval.no) = createCallerNode((yyvsp[-2].str),NULL);}
+#line 2188 "y.tab.c"
+    break;
+
+  case 80:
+#line 350 "exprtree.y"
+                       {(yyval.no) = createCallerNode((yyvsp[-3].str),(yyvsp[-1].no));}
+#line 2194 "y.tab.c"
+    break;
+
+  case 81:
+#line 353 "exprtree.y"
+                           {
+      struct tnode* temp = createArgsNode((yyvsp[0].no));
+      temp->arglist = (yyvsp[-2].no);
+      (yyval.no) = temp;
+    }
+#line 2204 "y.tab.c"
+    break;
+
+  case 82:
+#line 358 "exprtree.y"
+         {(yyval.no) = createArgsNode((yyvsp[0].no));}
+#line 2210 "y.tab.c"
+    break;
+
+  case 83:
+#line 363 "exprtree.y"
+                             {(yyval.no) = createStarNode((yyvsp[0].no));}
+#line 2216 "y.tab.c"
+    break;
+
+  case 84:
+#line 364 "exprtree.y"
+                      {(yyval.no) = createStarNode((yyvsp[-1].no));}
+#line 2222 "y.tab.c"
+    break;
+
+  case 85:
+#line 365 "exprtree.y"
+       {(yyval.no) = createIdNode((yyvsp[0].str),NULL,NULL);}
+#line 2228 "y.tab.c"
+    break;
+
+  case 86:
+#line 366 "exprtree.y"
+                    {(yyval.no) = createIdNode((yyvsp[-3].str),(yyvsp[-1].no),NULL);}
+#line 2234 "y.tab.c"
+    break;
+
+  case 87:
+#line 367 "exprtree.y"
+                                 {(yyval.no) = createIdNode((yyvsp[-6].str),(yyvsp[-4].no),(yyvsp[-1].no));}
+#line 2240 "y.tab.c"
     break;
 
 
-#line 1507 "y.tab.c"
+#line 2244 "y.tab.c"
 
       default: break;
     }
@@ -1735,7 +2472,7 @@ yyreturn:
 #endif
   return yyresult;
 }
-#line 204 "exprtree.y"
+#line 398 "exprtree.y"
 
 
 yyerror(char const *s){
@@ -1745,10 +2482,6 @@ yyerror(char const *s){
 }
 
 
-
-/*
-Task1+Task2 Completed
-*/
 int main(int argc, char* argv[]) {
 
     FILE* filePointer;
@@ -1764,7 +2497,11 @@ int main(int argc, char* argv[]) {
     // Initializing the pointer to the top of global symbol table to null
     gst = (struct globalSymbolTable*) malloc(sizeof(struct globalSymbolTable));
     gst->top = NULL;
-    gst->binding = 4096;
+
+    // Intializing the pointer to the top of local symbol table for currently executing function.
+    lst = (struct localSymbolTable*) malloc(sizeof(struct localSymbolTable));
+    lst->top = NULL;
+    lst->name = NULL;
 
     yyparse();
     fclose(filePointer);

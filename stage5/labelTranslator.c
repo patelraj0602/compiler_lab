@@ -39,7 +39,7 @@ int searchLabel(struct labelAddressTable* top, char* labelName){
 }
 
 void printLabelAddressTable(struct labelAddressTable* top){
-    printf("Printing all labels\n");
+    printf("Printing all labels\n"); 
     struct labelNode* temp = top->head;
     while(temp){
         printf("%s %d\n",temp->labelName,temp->address);

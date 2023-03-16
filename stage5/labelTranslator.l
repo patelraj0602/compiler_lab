@@ -13,16 +13,17 @@
 
     FILE* outFile;
     FILE* filePointer; 
+
 %}
 
 %%
 
-[L][0-9]+[ ]:\n {
+[LR][0-9]+[ ]:\n {
     if(pass==first)
         addLabel(top,strdup(yytext),2056+2*(addressNumber-1));
 }
 
-[L][0-9]+\n {
+[LR][0-9]+\n {
     if(pass==second){
         int jumpAddr = searchLabel(top,strdup(yytext));
         if(jumpAddr == -1){
@@ -33,6 +34,24 @@
     }
     else addressNumber++;
 }
+
+"main :\n" {
+    if(pass==first)
+        addLabel(top,strdup(yytext),2056+2*(addressNumber-1));
+}
+
+"main\n" {
+    if(pass==second){
+        int jumpAddr = searchLabel(top,strdup(yytext));
+        if(jumpAddr == -1){
+            printf("Label %s not found", yytext);
+            exit(1);
+        }
+        fprintf(outFile,"%d\n",jumpAddr);
+    }
+    else addressNumber++;
+}
+
 
 "\n" {
     if(pass==first) ++addressNumber; 

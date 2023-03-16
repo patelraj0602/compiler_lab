@@ -1,0 +1,16 @@
+decl
+    int n,fibo(str s,int i),*x[5];
+    str p;
+enddecl
+
+int main(){
+    decl
+        int result;
+    enddecl
+    begin
+        read(n);
+        write(*x[2]);
+        result = fibo(p,n);
+        return 0;
+    end
+}

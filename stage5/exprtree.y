@@ -1,7 +1,7 @@
 %{
-
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "exprtree.h" 
 #include "exprtree.c"
 #include "registers.h"
@@ -9,132 +9,287 @@
 int yylex(void);
 extern FILE* yyin; 
 extern char* yytext;
+
+// Global variables.
+int binding = 4095;                                     // Always points to the top of stack    
+int curType = undefined;                                // Stores the current type(int,str) of the variables
+int fLabel = -1;                                        // Stores function label
+    
 %} 
 
-%union{
+%union{ 
   int num;
   char* str;
-  struct tnode *no; 
-  struct gsymbol *gnode; 
+  struct tnode* no; 
+  struct gsymbol* gnode;
+  struct lsymbol* lnode;
+  struct paramList* pl;
 } 
 
-%type <no> identifier NUM STRING program slist stmt inputStmt outputStmt assignStmt expr ifStmt whileStmt doWhileStmt repeatUntilStmt 
-%type <gnode> declarations declList decl varList
+%type <no> identifier NUM STRING sList stmt inputStmt outputStmt assignStmt expr ifStmt whileStmt doWhileStmt repeatUntilStmt 
+%type <no> argList mainBlock fDefBlock fDef program
+%type <pl> param paramList
+%type <lnode> lId lIdList lDeclList lDecl
 %type <num> type
-%type <str> ID idDecl
+%type <str> ID identifierDecl fName mainHeader
 
 %token NUM ID STRING
 %token END BEG
 %token READ WRITE
 %token SEMICOLON ASSIGN
-%token PLUS MINUS MUL DIV 
+%token PLUS MINUS STAR DIV 
 %token LT GT LE GE NE ET
 %token IF THEN ELSE ENDIF 
 %token WHILE ENDWHILE DO BREAK CONTINUE
 %token REPEAT UNTIL
 %token INT STR
 %token DECL ENDDECL
+%token ADDR
+%token MAIN RETURN
 
 %left LT GT LE GE NE ET 
 %left PLUS MINUS 
-%left MUL DIV
+%left STAR DIV
+%left ADDR
  
 %%
 
-// program : declarations BEG slist END SEMICOLON{
-//         printf("success\n");
-//         // $$ = $2;
-//         helperFunction($3);
-//         // printPrefix($3);
-//         // evaluate($2);
-//    }
-//   | declarations BEG END SEMICOLON {exit(1);}
-//   | declarations {printf("Working ggod\n");}
-//   ;
+// New stuff
 
-// Global-declaration, Function-Block, Main-Block
-program : gDeclBlock fDefBlock mainBlock
-  | gDeclBlock mainBlock
-  | mainBlock
+// GLOBAL DECLARATION BLOCK : For declaring variables and functions.
+program : gDeclBlock fDefBlock mainBlock {
+      printGlobalSymbolTable();
+      printLocalSymbolTable();
+
+      // Printing expression tree
+      // printf("\nPrinting function def block\n");
+      // printPrefix($2);
+      // printf("\nPrinting mainblock\n");
+      // printPrefix($3);
+
+      {$$ = createTree(noNumber,voidType,NULL,emptyNode,$2,$3,NULL,NULL,NULL,NULL);}
+
+      // Call codegen
+      helperFunction($$);
+    }
+  | gDeclBlock mainBlock {
+      printGlobalSymbolTable();
+      printLocalSymbolTable();
+      printf("\n");
+      // printPrefix($2);
+      $$ = createTree(noNumber,voidType,NULL,emptyNode,$2,NULL,NULL,NULL,NULL,NULL);  
+
+      // Call codegen
+      helperFunction($$);
+    }
+  | mainBlock {
+      $$ = createTree(noNumber,voidType,NULL,emptyNode,$1,NULL,NULL,NULL,NULL,NULL);
+      // Call codegen
+      helperFunction($$);  
+    }
   ;
 
-// Grammer for global-declaration block
-gDeclBlock : DECL gDeclList ENDDECL
+gDeclBlock : DECL gDeclList ENDDECL {
+      // Binding of variables   
+      struct gsymbol* top = gst->top;
+      while(top){
+        if(top->flabel == -1){
+          top->binding = binding+1;
+          binding += top->size;
+        }
+        top = top->next;
+      }
+    }
   | DECL ENDDECL
   ;
 
-// Grammer for content inside global-declaration
 gDeclList : gDeclList gDecl
   | gDecl
+  ;
 
-gDecl : type gidList SEMICOLON
+
+gDecl : type gidList SEMICOLON {
+      // Adding type of variables for the entries in global symbol table
+      struct gsymbol* top = gst->top;
+      while(top){
+        if(top->type == undefined){
+          if(top->ispointer)  top->type = ($1 == intType) ? intPtrType : strPtrType;
+          else  top->type = $1;
+        }
+        top = top->next;
+      }
+    }
   ;
 
 gidList : gidList ',' gid
   | gid
   ;
 
-gid : 
-
-type : INT
-  | STR
-  ;
-
-
-declarations : DECL declList ENDDECL {
-      struct gsymbol* top = gst->top;
-      while(top){
-        top->binding = (gst->binding);
-        gst->binding += top->size;
-        top = top->next;
-      }
-      printGlobalSymbolTable();
-    } 
-  | DECL ENDDECL {}
-  ;
-
-declList : declList decl {}
-  | decl {}
-  ;
-
-decl : type varList SEMICOLON {
-    struct gsymbol* top = gst->top;
-    while((top)&&(top->type == -1)){
-      top->type = $1;
-      top=top->next;
+// Return type of function can only be an variable identifier(int,str)..
+gid : identifierDecl
+  | ID '(' paramList ')' {
+      // Making an entry in gst for function and also assigning label for that function.
+      gInstall($1,undefined,0,0,0,$3);
+      struct gsymbol* node = gLookup($1);
+      node->flabel = ++fLabel;
     }
-  }
+  | 
   ;
 
-type : INT  {$$ = intType;}
+// Only pointers, variables and 1d-2d array supported by language
+identifierDecl : STAR identifierDecl  {
+      struct gsymbol* node = gLookup($2);
+      node->ispointer = 1;
+    }
+  | ID  {gInstall($1,undefined,0,0,0,NULL); $$ = $1;}
+  | ID '[' expr ']' {gInstall($1,undefined,0,$3->val,0,NULL); $$ = $1;}
+  | ID '[' expr ']' '[' expr ']' {gInstall($1,undefined,0,$3->val,$6->val,NULL); $$ = $1;}
+  ;
+
+// FUNCTION INITIALIZATION ..
+fDefBlock : fDefBlock fDef {$$ = createTree(noNumber,voidType,NULL,emptyNode,$1,$2,NULL,NULL,NULL,NULL);}
+  | fDef {$$ = $1;}
+  ;
+
+fDef : fName '{' lDeclBlock BEG sList END '}' {$$ = createFunkNode($1,$5);}
+    | fName '{' lDeclBlock BEG END '}' {$$ = NULL;}
+  ;
+
+// CHANGES TO MAKE => Variables names of paramList must be unique.
+fName : type ID '(' paramList ')' {
+      // Finding the function entry from global symbol table
+      struct gsymbol* node = gLookup($2);
+
+      // Compare the function declaration with initialization to ensure that both of them are equal
+      if(!node) yyerror("Make sure to initialize the function %s\n",$2);
+      if(node->type != $1) yyerror("Return type mismatch between initialization and declaration of function %s\n",$2);
+      
+      // spl -- Stored param list
+      // npl -- New param list
+      // Both of the list should exactly match
+      struct paramList* spl = node->plist;
+      struct paramList* npl = $4;
+      while(spl || npl){
+        if((!spl)||(!npl)) yyerror("No of parameter of declaration and initialization does not match");
+        if((strcmp(spl->name,npl->name)!=0)||(spl->type != npl->type))
+          yyerror("parameters mismatch between declaration and initialization");
+        spl = spl->next;
+        npl = npl->next;
+      }
+
+      // Adding this list of parameters to the local symbol table of this function.
+      struct paramList* pl = $4;
+        while(pl){
+          struct lsymbol* temp = makeLSymbolNode(pl->name, pl->type, -1);
+          temp->next = node->ltop;
+          node->ltop = temp;
+          pl = pl->next;
+        }
+
+      // Return function name
+      $$ = $2;      
+    }
+  ;
+
+paramList : paramList ',' param {$3->next = $1; $$ = $3;}
+  | param {$$ = $1;}
+  ;
+
+// only variables and pointers can be passed as arguments not arrays.
+param : type ID {$$ = makeParamNode($1,$2,0);}
+  | type STAR ID  {$$ = makeParamNode($1,$3,1);}
+  ;
+
+type : INT {$$ = intType;}
   | STR {$$ = strType;}
   ;
 
-varList : varList ',' idDecl {install($3,-1,1,0);}
-  | varList ',' idDecl '[' NUM ']' {install($3,-1,$5->val,0);}
-  | varList ',' idDecl '[' NUM ']' '[' NUM ']' {
-      int val1 =  ($5->val); int val2 = ($8->val);
-      int size = val1*val2; 
-      install($3,-1,size,$8->val);
+
+// MAINBLOCK
+mainBlock : mainHeader '{' lDeclBlock BEG sList END '}' {
+      // Make an connector node and return that node
+      $$ = createMainNode($1,$5);
     }
-  | idDecl {install($1,-1,1,0);}
-  | idDecl '[' NUM ']' {install($1,-1,$3->val,0);}
-  | idDecl '[' NUM ']' '[' NUM ']' {
-      int val1 =  ($3->val); int val2 = ($6->val);
-      int size = val1*val2;
-      install($1,-1,size,$6->val);
-    }
-  ;
- 
-idDecl : ID {
-      $$ = $1;
-    }
+  | mainHeader '{' lDeclBlock BEG END '}' {}
   ;
 
+mainHeader : INT MAIN '(' ')' {
+      char* temp = malloc(5);
+      memcpy(temp, "main\0", 5);
+
+      gInstall(temp,intType,0,0,0,NULL);
+      struct gsymbol* node = gLookup(temp);
+      node->ltop = NULL;
+      node->flabel = ++fLabel;
+
+      $$ = temp;
+    }
+  ;
+
+// Adding the parameter of the functions to local decl block and also setting the (local symbol table variable)
+lDeclBlock : DECL lDeclList ENDDECL {
+      char* funkName = $<str>-1;
+
+      // Joining this local symbol table to the (ltop field of gsymbol)
+      struct gsymbol* gnode = gLookup(funkName);
+      struct lsymbol* top = $2;
+
+      while(top->next) top=top->next;
+      top->next = gnode->ltop;
+      gnode->ltop = $2;
+
+      // initializing lst value to current local symbol table for making an expression tree
+      lst->top = $2;
+      lst->name = funkName;
+    }
+  | DECL ENDDECL {
+      char* funkName = $<str>-1;
+      struct gsymbol* gnode = gLookup(funkName);
+
+      // initializing lst value to current local symbol table for making an expression tree
+      lst->top = gnode->ltop;
+      lst->name = funkName;
+    }
+  ;
+
+lDeclList : lDeclList lDecl {
+      // Both lDeclList and lDecl contains the pointer to head of the linked list of lsymbol node
+      struct lsymbol* l1 = $1;
+      struct lsymbol* l2 = $2;
+
+      // Get the last node of list2
+      while(l2->next) l2 = l2->next;
+      l2->next = l1;
+      $$ = $2;
+    }
+  | lDecl {$$ = $1;}
+  ;
+
+lDecl : type lIdList SEMICOLON {
+      struct lsymbol* top = $2;
+      while(top){
+        if(top->type == undefined){
+          if(top->ispointer) top->type = ($1 == intType) ? intPtrType : strPtrType;
+          else top->type = $1;
+        }
+        top = top->next;
+      }
+      $$ = $2;
+    }
+  ;
+
+lIdList : lIdList ',' lId {$3->next = $1; $$ = $3;}
+  | lId {$$ = $1;}
+  ;
+
+// only variables and pointers are allowed
+lId : ID {$$ = makeLSymbolNode($1,undefined,0);}
+  | STAR ID {$$ = makeLSymbolNode($2,undefined,1);}
+  ;
 
 
-
-slist : slist stmt {$$ = createTree(noNumber,voidType,NULL,emptyNode,$1,$2,NULL,NULL);}
+// Some more programming language constructs.
+sList : sList stmt {$$ = createTree(noNumber,voidType,NULL,emptyNode,$1,$2,NULL,NULL,NULL,NULL);}
   | stmt {$$ = $1;}
   ;
 
@@ -145,82 +300,102 @@ stmt : inputStmt {$$ = $1;}
   | whileStmt {$$ = $1;}
   | doWhileStmt {$$ = $1;}
   | repeatUntilStmt {$$ = $1;}
-  | BREAK SEMICOLON {$$ = createTree(noNumber,voidType,NULL,breakNode,NULL,NULL,NULL,NULL);}
-  | CONTINUE SEMICOLON {$$ = createTree(noNumber,voidType,NULL,continueNode,NULL,NULL,NULL,NULL);}
+  | BREAK SEMICOLON {$$ = createTree(noNumber,voidType,NULL,breakNode,NULL,NULL,NULL,NULL,NULL,NULL);}
+  | CONTINUE SEMICOLON {$$ = createTree(noNumber,voidType,NULL,continueNode,NULL,NULL,NULL,NULL,NULL,NULL);}
+  | ID '(' ')' SEMICOLON {$$ = createCallerNode($1,NULL);}
+  | ID '(' argList ')' SEMICOLON {$$ = createCallerNode($1,$3);}
+  | RETURN expr SEMICOLON {$$ = createReturnNode(lst->name,$2);}
   ;
 
-inputStmt : READ '(' identifier ')' SEMICOLON {$$ = createTree(noNumber,voidType,NULL,readNode,$3,NULL,NULL,NULL);}
+inputStmt : READ '(' identifier ')' SEMICOLON {$$ = createTree(noNumber,voidType,NULL,readNode,$3,NULL,NULL,NULL,NULL,NULL);}
   ;
 
-outputStmt : WRITE '(' expr ')' SEMICOLON {$$ = createTree(noNumber,voidType,NULL,writeNode,$3,NULL,NULL,NULL);}
+outputStmt : WRITE '(' expr ')' SEMICOLON {$$ = createTree(noNumber,voidType,NULL,writeNode,$3,NULL,NULL,NULL,NULL,NULL);}
   ;
 
-assignStmt : identifier ASSIGN expr SEMICOLON {$$ = createTree(noNumber,voidType,NULL,assignNode,$1,$3,NULL,NULL);}
+assignStmt : identifier ASSIGN expr SEMICOLON {$$ = createTree(noNumber,voidType,NULL,assignNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | identifier ASSIGN ADDR identifier SEMICOLON {
+      struct tnode* newAddrNode = createAddrNode($4);
+      $$ = createTree(noNumber,voidType,NULL,assignNode,$1,newAddrNode,NULL,NULL,NULL,NULL);
+    }
   ;
 
-ifStmt : IF '(' expr ')' THEN slist ELSE slist ENDIF SEMICOLON {$$ = createTree(noNumber,voidType,NULL,ifElseNode,$6,$8,$3,NULL);}
-  | IF '(' expr ')' THEN slist ENDIF SEMICOLON {$$ = createTree(noNumber,voidType,NULL,ifElseNode,$6,NULL,$3,NULL);}
+ifStmt : IF '(' expr ')' THEN sList ELSE sList ENDIF SEMICOLON {$$ = createTree(noNumber,voidType,NULL,ifElseNode,$6,$8,$3,NULL,NULL,NULL);}
+  | IF '(' expr ')' THEN sList ENDIF SEMICOLON {$$ = createTree(noNumber,voidType,NULL,ifElseNode,$6,NULL,$3,NULL,NULL,NULL);}
   ;
 
-whileStmt : WHILE '(' expr ')' DO slist ENDWHILE SEMICOLON  {$$ = createTree(noNumber,voidType,NULL,whileNode,$6,NULL,$3,NULL);}
+whileStmt : WHILE '(' expr ')' DO sList ENDWHILE SEMICOLON  {$$ = createTree(noNumber,voidType,NULL,whileNode,$6,NULL,$3,NULL,NULL,NULL);}
   ;
 
-doWhileStmt : DO slist WHILE '(' expr ')' SEMICOLON {$$ = createTree(noNumber,voidType,NULL,doWhileNode,$2,NULL,$5,NULL);}
+doWhileStmt : DO sList WHILE '(' expr ')' SEMICOLON {$$ = createTree(noNumber,voidType,NULL,doWhileNode,$2,NULL,$5,NULL,NULL,NULL);}
   ;
 
-repeatUntilStmt : REPEAT slist UNTIL '(' expr ')' SEMICOLON {$$ = createTree(noNumber,voidType,NULL,repeatUntilNode,$2,NULL,$5,NULL);}
+repeatUntilStmt : REPEAT sList UNTIL '(' expr ')' SEMICOLON {$$ = createTree(noNumber,voidType,NULL,repeatUntilNode,$2,NULL,$5,NULL,NULL,NULL);}
   ;
 
-expr : expr PLUS expr  {$$ = createTree(noNumber,intType,NULL,addNode,$1,$3,NULL,NULL);}
-  | expr MINUS expr   {$$ = createTree(noNumber,intType,NULL,subNode,$1,$3,NULL,NULL);}
-  | expr MUL expr {$$ = createTree(noNumber,intType,NULL,mulNode,$1,$3,NULL,NULL);}
-  | expr DIV expr {$$ = createTree(noNumber,intType,NULL,divNode,$1,$3,NULL,NULL);}
-  | expr LT expr {$$ = createTree(noNumber,boolType,NULL,lessNode,$1,$3,NULL,NULL);}
-  | expr GT expr {$$ = createTree(noNumber,boolType,NULL,greaterNode,$1,$3,NULL,NULL);}
-  | expr LE expr {$$ = createTree(noNumber,boolType,NULL,lessEqualNode,$1,$3,NULL,NULL);}
-  | expr GE expr {$$ = createTree(noNumber,boolType,NULL,greaterEqualNode,$1,$3,NULL,NULL);}
-  | expr NE expr {$$ = createTree(noNumber,boolType,NULL,notEqualNode,$1,$3,NULL,NULL);}
-  | expr ET expr {$$ = createTree(noNumber,boolType,NULL,equalNode,$1,$3,NULL,NULL);}
+// Maybe add support for negative number too later.. 
+expr : expr PLUS expr  {$$ = createTree(noNumber,intType,NULL,addNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr MINUS expr   {$$ = createTree(noNumber,intType,NULL,subNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr STAR expr {$$ = createTree(noNumber,intType,NULL,mulNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr DIV expr {$$ = createTree(noNumber,intType,NULL,divNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr LT expr {$$ = createTree(noNumber,boolType,NULL,lessNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr GT expr {$$ = createTree(noNumber,boolType,NULL,greaterNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr LE expr {$$ = createTree(noNumber,boolType,NULL,lessEqualNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr GE expr {$$ = createTree(noNumber,boolType,NULL,greaterEqualNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr NE expr {$$ = createTree(noNumber,boolType,NULL,notEqualNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr ET expr {$$ = createTree(noNumber,boolType,NULL,equalNode,$1,$3,NULL,NULL,NULL,NULL);}
   | '(' expr ')' {$$ = $2;}
   | NUM {$$ = $1;}
   | identifier {$$ = $1;}
   | STRING {$$ = $1;}
+  | ID '(' ')' {$$ = createCallerNode($1,NULL);}
+  | ID '(' argList ')' {$$ = createCallerNode($1,$3);}
   ;
 
-identifier : ID {
-        /* Make node for this */ 
-        struct gsymbol* temp = lookup($1);
-        if(temp == NULL) yyerror("Identifier not found in global symbol table!!\n");
-
-        if(temp->type == intType)
-          $$ = createTree(noNumber,intType,$1,idNode,NULL,NULL,NULL,temp);
-        else if(temp->type == strType)
-           $$ = createTree(noNumber,strType,$1,idNode,NULL,NULL,NULL,temp);
-        else yyerror("No matching variable type!!\n");
+argList : argList ',' expr {
+      struct tnode* temp = createArgsNode($3);
+      temp->arglist = $1;
+      $$ = temp;
     }
-
-  | ID '[' expr ']' {
-      struct gsymbol* temp = lookup($1);
-        if(temp == NULL) yyerror("Identifier not found in global symbol table!!\n");
-
-        if(temp->type == intType)
-          $$ = createTree(noNumber,intType,$1,idNode,$3,NULL,NULL,temp);
-        else if(temp->type == strType)
-           $$ = createTree(noNumber,strType,$1,idNode,$3,NULL,NULL,temp);
-        else yyerror("No matching variable type!!\n");
-    }
-
-  | ID '[' expr ']' '[' expr ']' {
-      struct gsymbol* temp = lookup($1);
-        if(temp == NULL) yyerror("Identifier not found in global symbol table!!\n");
-
-        if(temp->type == intType)
-          $$ = createTree(noNumber,intType,$1,idNode,$3,$6,NULL,temp);
-        else if(temp->type == strType)
-           $$ = createTree(noNumber,strType,$1,idNode,$3,$6,NULL,temp);
-        else yyerror("No matching variable type!!\n");
-    }
+  | expr {$$ = createArgsNode($1);}
   ;
+
+// Pointers are supported both for variables identifers and arrays
+// Also you can dereference an expression.
+identifier : STAR identifier {$$ = createStarNode($2);}
+  | STAR '(' expr ')' {$$ = createStarNode($3);}
+  | ID {$$ = createIdNode($1,NULL,NULL);}
+  | ID '[' expr ']' {$$ = createIdNode($1,$3,NULL);}
+  | ID '[' expr ']' '[' expr ']' {$$ = createIdNode($1,$3,$6);}
+
+
+// identifier : ID {
+//         /* Make node for this */ 
+//         struct gsymbol* gTableEntry = lookup($1);
+//         if(gTableEntry == NULL) yyerror("Identifier not found in global symbol table!!\n");
+//         $$ = createTree(noNumber,gTableEntry->type,$1,idNode,NULL,NULL,NULL,gTableEntry); 
+//     }
+
+//   | ID '[' expr ']' {
+//         struct gsymbol* gTableEntry = lookup($1);
+//         if(gTableEntry == NULL) yyerror("Identifier not found in global symbol table!!\n");
+//         $$ = createTree(noNumber,gTableEntry->type,$1,idNode,$3,NULL,NULL,gTableEntry);
+//     }
+
+//   | ID '[' expr ']' '[' expr ']' {
+//         struct gsymbol* gTableEntry = lookup($1);
+//         if(gTableEntry == NULL) yyerror("Identifier not found in global symbol table!!\n");
+//         $$ = createTree(noNumber,gTableEntry->type,$1,idNode,$3,$6,NULL,gTableEntry); 
+//     }
+  
+//   | STAR ID {
+//     struct gsymbol* gTableEntry = lookup($2);
+//     if(gTableEntry == NULL) yyerror("Identifier not found in global symbol table!!\n");
+
+//     struct tnode* newIdNode = createTree(noNumber,gTableEntry->type,$2,idNode,NULL,NULL,NULL,gTableEntry);
+//     $$ = createStarNode(newIdNode);
+//   }
+//   ;
 
 %%
 
@@ -231,10 +406,6 @@ yyerror(char const *s){
 }
 
 
-
-/*
-Task1+Task2 Completed
-*/
 int main(int argc, char* argv[]) {
 
     FILE* filePointer;
@@ -250,7 +421,11 @@ int main(int argc, char* argv[]) {
     // Initializing the pointer to the top of global symbol table to null
     gst = (struct globalSymbolTable*) malloc(sizeof(struct globalSymbolTable));
     gst->top = NULL;
-    gst->binding = 4096;
+
+    // Intializing the pointer to the top of local symbol table for currently executing function.
+    lst = (struct localSymbolTable*) malloc(sizeof(struct localSymbolTable));
+    lst->top = NULL;
+    lst->name = NULL;
 
     yyparse();
     fclose(filePointer);

@@ -60,7 +60,7 @@ extern int yydebug;
     ASSIGN = 266,
     PLUS = 267,
     MINUS = 268,
-    MUL = 269,
+    STAR = 269,
     DIV = 270,
     LT = 271,
     GT = 272,
@@ -82,7 +82,10 @@ extern int yydebug;
     INT = 288,
     STR = 289,
     DECL = 290,
-    ENDDECL = 291
+    ENDDECL = 291,
+    ADDR = 292,
+    MAIN = 293,
+    RETURN = 294
   };
 #endif
 /* Tokens.  */
@@ -97,7 +100,7 @@ extern int yydebug;
 #define ASSIGN 266
 #define PLUS 267
 #define MINUS 268
-#define MUL 269
+#define STAR 269
 #define DIV 270
 #define LT 271
 #define GT 272
@@ -120,19 +123,24 @@ extern int yydebug;
 #define STR 289
 #define DECL 290
 #define ENDDECL 291
+#define ADDR 292
+#define MAIN 293
+#define RETURN 294
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 14 "exprtree.y"
-
+#line 20 "exprtree.y"
+ 
   int num;
   char* str;
-  struct tnode *no; 
-  struct gsymbol *gnode; 
+  struct tnode* no; 
+  struct gsymbol* gnode;
+  struct lsymbol* lnode;
+  struct paramList* pl;
 
-#line 136 "y.tab.h"
+#line 144 "y.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
