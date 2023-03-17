@@ -46,8 +46,9 @@ int fLabel = -1;                                        // Stores function label
 %token DECL ENDDECL
 %token ADDR
 %token MAIN RETURN
+%token AND OR
 
-%left LT GT LE GE NE ET 
+%left LT GT LE GE NE ET AND OR
 %left PLUS MINUS 
 %left STAR DIV
 %left ADDR
@@ -344,8 +345,11 @@ expr : expr PLUS expr  {$$ = createTree(noNumber,intType,NULL,addNode,$1,$3,NULL
   | expr GE expr {$$ = createTree(noNumber,boolType,NULL,greaterEqualNode,$1,$3,NULL,NULL,NULL,NULL);}
   | expr NE expr {$$ = createTree(noNumber,boolType,NULL,notEqualNode,$1,$3,NULL,NULL,NULL,NULL);}
   | expr ET expr {$$ = createTree(noNumber,boolType,NULL,equalNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr AND expr {$$ = createTree(noNumber,boolType,NULL,andNode,$1,$3,NULL,NULL,NULL,NULL);}
+  | expr OR expr {$$ = createTree(noNumber,boolType,NULL,orNode,$1,$3,NULL,NULL,NULL,NULL);}
   | '(' expr ')' {$$ = $2;}
   | NUM {$$ = $1;}
+  | ADDR identifier {$$ = createAddrNode($2);}
   | identifier {$$ = $1;}
   | STRING {$$ = $1;}
   | ID '(' ')' {$$ = createCallerNode($1,NULL);}
@@ -368,34 +372,6 @@ identifier : STAR identifier {$$ = createStarNode($2);}
   | ID '[' expr ']' {$$ = createIdNode($1,$3,NULL);}
   | ID '[' expr ']' '[' expr ']' {$$ = createIdNode($1,$3,$6);}
 
-
-// identifier : ID {
-//         /* Make node for this */ 
-//         struct gsymbol* gTableEntry = lookup($1);
-//         if(gTableEntry == NULL) yyerror("Identifier not found in global symbol table!!\n");
-//         $$ = createTree(noNumber,gTableEntry->type,$1,idNode,NULL,NULL,NULL,gTableEntry); 
-//     }
-
-//   | ID '[' expr ']' {
-//         struct gsymbol* gTableEntry = lookup($1);
-//         if(gTableEntry == NULL) yyerror("Identifier not found in global symbol table!!\n");
-//         $$ = createTree(noNumber,gTableEntry->type,$1,idNode,$3,NULL,NULL,gTableEntry);
-//     }
-
-//   | ID '[' expr ']' '[' expr ']' {
-//         struct gsymbol* gTableEntry = lookup($1);
-//         if(gTableEntry == NULL) yyerror("Identifier not found in global symbol table!!\n");
-//         $$ = createTree(noNumber,gTableEntry->type,$1,idNode,$3,$6,NULL,gTableEntry); 
-//     }
-  
-//   | STAR ID {
-//     struct gsymbol* gTableEntry = lookup($2);
-//     if(gTableEntry == NULL) yyerror("Identifier not found in global symbol table!!\n");
-
-//     struct tnode* newIdNode = createTree(noNumber,gTableEntry->type,$2,idNode,NULL,NULL,NULL,gTableEntry);
-//     $$ = createStarNode(newIdNode);
-//   }
-//   ;
 
 %%
 

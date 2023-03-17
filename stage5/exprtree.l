@@ -57,6 +57,8 @@ int number;
 ">="                    {return GE;}
 "!="                    {return NE;}
 "=="                    {return ET;}
+"&&"                    {return AND;}
+"||"                    {return OR;}       
 [ \t]                   {}
 [(){}]                  {return *yytext;}
 [\[\]]                  {return *yytext;}

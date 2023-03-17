@@ -85,7 +85,9 @@ extern int yydebug;
     ENDDECL = 291,
     ADDR = 292,
     MAIN = 293,
-    RETURN = 294
+    RETURN = 294,
+    AND = 295,
+    OR = 296
   };
 #endif
 /* Tokens.  */
@@ -126,6 +128,8 @@ extern int yydebug;
 #define ADDR 292
 #define MAIN 293
 #define RETURN 294
+#define AND 295
+#define OR 296
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -140,7 +144,7 @@ union YYSTYPE
   struct lsymbol* lnode;
   struct paramList* pl;
 
-#line 144 "y.tab.h"
+#line 148 "y.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

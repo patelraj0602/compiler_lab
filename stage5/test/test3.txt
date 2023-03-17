@@ -1,0 +1,20 @@
+decl
+    int n, fun(int p, int q, int r);
+enddecl
+
+int fun(int p, int q, int r){
+    decl
+    enddecl
+    begin
+    end
+}
+
+int main(){
+    decl
+        int result,a,b,c;
+    enddecl
+    begin
+        result = fun(a+b,b+c,c+a);
+        return 0;
+    end
+}

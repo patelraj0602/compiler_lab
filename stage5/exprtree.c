@@ -27,6 +27,8 @@ void validate(int nodetype, struct tnode* left, struct tnode* right, struct tnod
         yyerror("Invalid expression inside write system call !!");
     else if(((nodetype==whileNode)||(nodetype==doWhileNode)||(nodetype==repeatUntilNode)) && (exprVal->type != boolType))
         yyerror("Invalid expression inside looping construct !!");
+    else if((nodetype == andNode || nodetype == orNode) && ((left->type != boolType)||(right->type != boolType)))
+        yyerror("type mismatch !!");
     else if(nodetype == idNode){
         // id[a][b] (a and b cannot be of boolean type) AND (a and b must be within bound) 
         if((left)&&(left->type == boolType)) yyerror("Invalid expression inside identifier !!");

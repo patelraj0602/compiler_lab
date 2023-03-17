@@ -114,16 +114,15 @@ int getAddressOfIdentifier(struct tnode* t, FILE* targetFile){
     struct lsymbol* lstValue;
     int tempValue;
 
-    r1 = getReg();
 
     // Used while assignNode: Support for 1-2d arrays are yet to added for this pointerNode
     // Also that variable should be an global variable
     if(t->left->nodetype == pointerNode){
-        gstValue = t->left->left->gentry;             
-        fprintf(targetFile, "MOV R%d, %d\n", r1, gstValue->binding);
+        r1 = getAddressOfIdentifier(t->left, targetFile);
         fprintf(targetFile, "MOV R%d, [R%d]\n",r1,r1);
     }
     else{
+        r1 = getReg();
         gstValue = t->left->gentry;
         lstValue = t->left->lentry;
         tempValue = (lstValue) ? lstValue->binding : gstValue->binding;
@@ -338,6 +337,22 @@ int codeGen(struct tnode* t, FILE* targetFile){
                         leftReg = codeGen(t->left, targetFile);
                         rightReg = codeGen(t->right, targetFile);
                         fprintf(targetFile, "EQ R%d, R%d\n", leftReg, rightReg);
+                        freeReg();
+                        return leftReg;
+
+        // Updated :
+        case andNode : 
+                        leftReg = codeGen(t->left, targetFile);
+                        rightReg = codeGen(t->right, targetFile);
+                        fprintf(targetFile, "MUL R%d, R%d\n", leftReg, rightReg);
+                        freeReg();
+                        return leftReg;
+
+        // Updated :
+        case orNode : 
+                        leftReg = codeGen(t->left, targetFile);
+                        rightReg = codeGen(t->right, targetFile);
+                        fprintf(targetFile, "ADD R%d, R%d\n", leftReg, rightReg);
                         freeReg();
                         return leftReg;
 

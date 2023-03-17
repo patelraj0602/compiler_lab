@@ -38,6 +38,8 @@
 #define returnNode 35
 #define mainNode 36
 #define funkNode 37
+#define andNode 38
+#define orNode 39
 
 int varArr[26];
 
