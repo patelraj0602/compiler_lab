@@ -1,0 +1,22 @@
+decl
+    int n,*n1,fibo(int n, int m, int q), *arr[5], *arr1[10][20];
+    str x,y,*x1,*y1,arr2[5],arr3[6][12],*arr4[63],*arr5[12][56];
+enddecl
+
+int fibo(int n, int m, int q){
+    decl
+        int res, *res1;
+        str res2, *res3;
+    enddecl
+    begin
+    end
+}
+
+int main(){
+    decl
+        int result, *result1;
+        str result2, *result3;
+    enddecl
+    begin
+    end
+}
