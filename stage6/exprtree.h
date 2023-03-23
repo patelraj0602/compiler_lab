@@ -10,12 +10,12 @@
 #define valNode 9  
 #define noNumber 10 
 
-#define voidType 11 
-#define intType 12
-#define boolType 13
-#define strType 14
-#define intPtrType 15 
-#define strPtrType 16
+// #define voidType 11 
+// #define intType 12
+// #define boolType 13
+// #define strType 14
+// #define intPtrType 15 
+// #define strPtrType 16
 #define undefined 17
 
 #define whileNode 18
@@ -40,18 +40,43 @@
 #define funkNode 37
 #define andNode 38
 #define orNode 39
+#define fieldNode 40              // User defined datatype node
+#define dotOperatorNode 41
+#define allocNode 42
+#define initNode 43
+#define freeNode 44
+#define nullNode 45
 
 int varArr[26];
 
+struct typeTable{
+    char* name;                 // Name of the type
+    int size;                   // Size of the type
+    struct fieldList* fields;   // Pointer to the head of fields list
+    struct typeTable* next;     // Pointer to the next type table entry;
+};
+
+struct typeTableList{
+    struct typeTable* top;
+};
+
+struct fieldList{
+  char *name;                   //name of the field
+  int findex;                   //the position of the field in the field list
+  struct typeTable *type;       //pointer to type table entry of the field's type
+  struct fieldList *next;       //pointer to the next field
+};
+
+
 struct paramList{
     char* name;                 // name of parameter
-    int type;                   // type of parameter
+    struct typeTable* type;     // type of parameter
     struct paramList* next;
 };
 
 struct gsymbol {
     char* name;                 // name of the variable
-    int type;                   // type of the variable
+    struct typeTable* type;     // type of the variable
     int ispointer;              // Tells whether the type data type is pointer or not
     int size;                   // size of the type of the variable
     int binding;                // stores the static memory address allocated to the variable
@@ -64,7 +89,7 @@ struct gsymbol {
 
 struct lsymbol {
     char* name;                 // name of the variable
-    int type;                   // type of variable
+    struct typeTable* type;     // type of variable
     int ispointer;              // whether the type is pointer-type or not
     int binding;                // Address binding for this variable(At runtime)
     struct lsymbol* next;       
@@ -72,7 +97,7 @@ struct lsymbol {
 
 typedef struct tnode { 
     int val;                    // value of a number for NUM nodes.
-    int type;                   // type of variable
+    struct typeTable* type;     // type of variable
     char* varname;              // name of a variable for ID nodes or strings if it is of nodetype strNode
     int nodetype;               // information about non-leaf nodes - read/write/connector/+/* etc.
     struct tnode *left,*right;  // left and right branches
@@ -96,27 +121,34 @@ struct localSymbolTable{
 
 struct globalSymbolTable* gst;                          // Pointer to the top of global symbol table
 struct localSymbolTable* lst;                           // Pointer to the top of local symbol table for curring running function
+struct typeTableList* ttt;                              // Pointer to the top of type table list
 /* Global variables */                                           
 int binding;                                                
 int curType;                                            
 int fLabel; 
 
 // Functions for paramlist
-struct paramList* makeParamNode(int type, char* name, int isPointer);
+struct paramList* makeParamNode(struct typeTable* type, char* name, int isPointer);
 
 //  Functions for global symbol table.
 struct gsymbol* gLookup(char* name);                                                                                             // Returns a pointer to the symbol table entry for the variable, returns NULL otherwise
-void gInstall(char* name, int type, int isPointer, int shape0, int shape1, struct paramList* plist);                            // Creates a symbol table entry.
-void printGlobalSymbolTable(void);                                                                                              // To print the global symbol table.
+void gInstall(char* name, struct typeTable* type, int isPointer, int shape0, int shape1, struct paramList* plist);                            // Creates a symbol table entry.
 
 // Functions for local symbol table.
-void printLocalSymbolTable(void);
-struct lsymbol* makeLSymbolNode(char* name, int type, int ispointer);
+struct lsymbol* makeLSymbolNode(char* name, struct typeTable* type, int ispointer);
 struct lsymbol* lLookup(char* name);
+
+// Function for type table and fieldList
+void createTypeTable(void);                                                                                                     // Initializes the type table with default and special data types
+struct typeTable* tLookup(char* name);                                                                                          // Find the type table entry corresponding to any particular name of data type.
+void tInstall(char* name, int size, struct fieldList* fields);                                                                  // Installs an new entry into type table
+struct fieldList* fLookup(struct typeTable* type, char* name);                                                                         // Searches for a field of give name in the fieldlist of the user-defined type
+int getSize(struct typeTable* type);                                                                                                   // Return the amount of memory words required to store a variable of the given type.  
+struct fieldList* makeFieldNode(char* name, struct typeTable* type);
 
 /*Create a node tnode*/
 void validate(int nodetype, struct tnode* left, struct tnode* right, struct tnode* exprVal,struct gsymbol* gentry);
-struct tnode* createTree(int val, int type, char* c, int nodetype, struct tnode *l, struct tnode *r, struct tnode* exprVal,struct gsymbol* gentry, struct lsymbol* lentry, struct tnode* arglist);
+struct tnode* createTree(int val, struct typeTable* type, char* c, int nodetype, struct tnode *l, struct tnode *r, struct tnode* exprVal,struct gsymbol* gentry, struct lsymbol* lentry, struct tnode* arglist);
 struct tnode* createStarNode(struct tnode* l);                                                                                                              
 struct tnode* createAddrNode(struct tnode* l);
 struct tnode* createIdNode(char* name, struct tnode* left, struct tnode* right);
@@ -125,8 +157,19 @@ struct tnode* createCallerNode(char* name, struct tnode* arglist);
 struct tnode* createReturnNode(char* name, struct tnode* left);
 struct tnode* createMainNode(char* name, struct tnode* left);
 struct tnode* createFunkNode(char* name, struct tnode* left);
+struct tnode* makeDotOperatorNode1(char* n1, char* n2);
+struct tnode* makeDotOperatorNode2(struct tnode* left, char* r);
+struct tnode* makeAllocNode(struct tnode* left);
+struct tnode* makeMemInitNode(void);
+struct tnode* makeFreeNode(struct tnode* left);
+struct tnode* makeNullNode();
 int operatorCheck(int nodeType);
   
+// Printing different datastructures
+void printGlobalSymbolTable(void);                                                                                              // To print the global symbol table.
+void printLocalSymbolTable(void);
+void printTypeTable(void);
+
 /*To evaluate an expression tree*/ 
 // int evaluate(struct tnode *t);
 

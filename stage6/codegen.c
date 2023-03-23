@@ -108,6 +108,59 @@ void readFunctionCall(FILE* targetFile, int reg){
     freeReg(); 
 }
 
+void memInitNode(FILE* targetFile){
+    fprintf(targetFile, "MOV R%d, \"Initialize\"\n",0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "CALL 0\n");
+    fprintf(targetFile, "POP R%d\n", 0);               
+    fprintf(targetFile, "POP R%d\n", 0);
+    fprintf(targetFile, "POP R%d\n", 0);
+    fprintf(targetFile, "POP R%d\n", 0);
+    fprintf(targetFile, "POP R%d\n", 0);
+    
+}
+
+int memAllocNode(FILE* targetFile){
+    reg_index fr = getReg();
+
+    fprintf(targetFile, "MOV R%d, \"Alloc\"\n",0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "CALL 0\n");
+    fprintf(targetFile, "POP R%d\n", fr);               
+    fprintf(targetFile, "POP R%d\n", 0);
+    fprintf(targetFile, "POP R%d\n", 0);
+    fprintf(targetFile, "POP R%d\n", 0);
+    fprintf(targetFile, "POP R%d\n", 0);
+
+    return fr;
+}
+
+void memFreeNode(FILE* targetFile, int reg){
+
+    fprintf(targetFile, "MOV R%d, \"Free\"\n",0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "MOV R%d, R%d\n",0,reg);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "PUSH R%d\n", 0);
+    fprintf(targetFile, "CALL 0\n");
+    fprintf(targetFile, "POP R%d\n", 0);               
+    fprintf(targetFile, "POP R%d\n", 0);
+    fprintf(targetFile, "POP R%d\n", 0);
+    fprintf(targetFile, "POP R%d\n", 0);
+    fprintf(targetFile, "POP R%d\n", 0);
+
+}
+
 int getAddressOfIdentifier(struct tnode* t, FILE* targetFile){
     reg_index r1,r2;
     struct gsymbol* gstValue;
@@ -120,6 +173,13 @@ int getAddressOfIdentifier(struct tnode* t, FILE* targetFile){
     if(t->left->nodetype == pointerNode){
         r1 = getAddressOfIdentifier(t->left, targetFile);
         fprintf(targetFile, "MOV R%d, [R%d]\n",r1,r1);
+    }
+    else if(t->left->nodetype == dotOperatorNode){
+        // If the identifier is an field
+        r1 = codeGen(t->left->left, targetFile);
+        r2 = codeGen(t->left->right, targetFile);
+        fprintf(targetFile, "ADD R%d, R%d\n",r1,r2);
+        freeReg();
     }
     else{
         r1 = getReg();
@@ -592,6 +652,60 @@ int codeGen(struct tnode* t, FILE* targetFile){
                         leftReg = codeGen(t->left, targetFile);
                         break;
 
+        case dotOperatorNode :
+                        leftReg = codeGen(t->left, targetFile);
+                        rightReg = codeGen(t->right, targetFile);
+                        fprintf(targetFile, "ADD R%d, R%d\n",leftReg,rightReg);
+                        fprintf(targetFile, "MOV R%d, [R%d]\n",leftReg,leftReg);
+                        freeReg();
+                        return leftReg;
+
+        case fieldNode :
+                        fr = getReg();
+                        fprintf(targetFile, "MOV R%d, %d\n",fr,t->val);
+                        return fr;
+
+        case initNode :
+                        // Store the registers
+                        for(i=0; i<=count; i++) fprintf(targetFile, "PUSH R%d\n",i);
+                        memInitNode(targetFile);
+                        // Pop the registers
+                        for(i=count; i>=0; i--) fprintf(targetFile, "POP R%d\n",i);
+                        break;
+
+        case allocNode :
+                        leftReg = getAddressOfIdentifier(t,targetFile);
+
+                        // Store the registers
+                        for(i=0; i<=count; i++) fprintf(targetFile, "PUSH R%d\n",i);
+                        pushInStack(count);                         // Pushing count
+                        
+                        rightReg = memAllocNode(targetFile);
+
+                        count = popFromStack();                     // Popping count
+                        for(i=count; i>=0; i--) fprintf(targetFile, "POP R%d\n",i);
+
+                        fprintf(targetFile, "MOV [R%d], R%d\n",leftReg,rightReg);
+                        freeReg();
+                        break;
+
+        case freeNode : 
+                        // Store the registers
+                        for(i=0; i<=count; i++) fprintf(targetFile, "PUSH R%d\n",i);
+                        pushInStack(count);                         // Pushing count
+                        
+                        leftReg = codeGen(t->left, targetFile);
+                        memFreeNode(targetFile,leftReg);
+                        freeReg();
+
+                        count = popFromStack();                     // Popping count
+                        for(i=count; i>=0; i--) fprintf(targetFile, "POP R%d\n",i);
+                        break;
+
+        case nullNode : 
+                        fr = getReg();
+                        fprintf(targetFile, "MOV R%d, %d\n",fr,0);
+                        return fr;
 
         case breakNode :
                         tempValue = tos->top->val;

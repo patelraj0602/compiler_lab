@@ -15,6 +15,9 @@ void makeHeader(FILE* targetFile);
 void writeFunctionCall(FILE* targetFile, int reg);
 void readFunctionCall(FILE* targetFile, int reg);
 void exitFunctionCall(FILE* targetFile); 
+void memFreeNode(FILE* targetFile, int reg);
+int memAllocNode(FILE* targetFile);
+void memInitNode(FILE* targetFile);
 void helperFunction(struct tnode* root);    
 
 // Making an stack to support nesting loop constructs.

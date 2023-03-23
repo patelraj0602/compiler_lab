@@ -17,41 +17,56 @@ int operatorCheck(int nodeType){
 }
 
 void validate(int nodetype, struct tnode* left, struct tnode* right, struct tnode* exprVal,struct gsymbol* gentry){
-    if(operatorCheck(nodetype) && ((left->type != intType)||(right->type != intType)))
+    // For null node
+    if(nodetype == equalNode || nodetype == notEqualNode){
+        if(right->type == tLookup("null")){
+            if((left->type == tLookup("int"))||(left->type == tLookup("str"))||(left->type == tLookup("bool"))||(left->type == tLookup("void")))
+                yyerror("null is only compatible with pointer data types!!");
+        }
+        else if((left->type != tLookup("int"))||(right->type != tLookup("int")))
+            yyerror("Integer type mismatch !!");
+    }
+    else if(operatorCheck(nodetype) && ((left->type != tLookup("int"))||(right->type != tLookup("int"))))
         yyerror("Integer type mismatch !!");
-    else if((nodetype == assignNode) && (left->type != right->type))
-        yyerror("type mismatch while assigning !!");   
-    else if((nodetype == ifElseNode) && (exprVal->type != boolType))
+    else if(nodetype == assignNode){
+        if(right->type == tLookup("null")){
+            if((left->type == tLookup("int"))||(left->type == tLookup("str")))
+                yyerror("null is only compatible with pointer data types!!");
+        }
+        else if(left->type != right->type)
+            yyerror("type mismatch while assigning !!");   
+    }
+    else if((nodetype == ifElseNode) && (exprVal->type != tLookup("bool")))
         yyerror("Invalid expression for if/else condition !!");
-    else if((nodetype == writeNode) && (left->type == boolType))
+    else if((nodetype == writeNode) && (left->type == tLookup("bool")))
         yyerror("Invalid expression inside write system call !!");
-    else if(((nodetype==whileNode)||(nodetype==doWhileNode)||(nodetype==repeatUntilNode)) && (exprVal->type != boolType))
+    else if(((nodetype==whileNode)||(nodetype==doWhileNode)||(nodetype==repeatUntilNode)) && (exprVal->type != tLookup("bool")))
         yyerror("Invalid expression inside looping construct !!");
-    else if((nodetype == andNode || nodetype == orNode) && ((left->type != boolType)||(right->type != boolType)))
+    else if((nodetype == andNode || nodetype == orNode) && ((left->type != tLookup("bool"))||(right->type != tLookup("bool"))))
         yyerror("type mismatch !!");
     else if(nodetype == idNode){
         // id[a][b] (a and b cannot be of boolean type) AND (a and b must be within bound) 
-        if((left)&&(left->type == boolType)) yyerror("Invalid expression inside identifier !!");
-        if((right)&&(right->type == boolType)) yyerror("Invalid expression inside identifier !!");
+        if((left)&&(left->type == tLookup("bool"))) yyerror("Invalid expression inside identifier !!");
+        if((right)&&(right->type == tLookup("bool"))) yyerror("Invalid expression inside identifier !!");
 
-        // if((!left)&&(!right)){
-        //     if((gentry->shape[0])||(gentry->shape[1])) yyerror("The identifier not matching with declaration !!");
-        // }
-        // else if((left)&&(!right)){
-        //     if((!gentry->shape[0])||(gentry->shape[1])) yyerror("The identifier not matching with declaration !!");
-        //     if(left->val >= gentry->shape[0]) yyerror("Program trying to access out of the bound in an 1d array !!");
-        // }
-        // else if((left)&&(right)){
-        //     if((!gentry->shape[0])||(!gentry->shape[1])) yyerror("The identifier not matching with declaration !!");
-        //     if((left->val >= gentry->shape[0])||(right->val >= gentry->shape[1])) yyerror("Program trying to access out of bound in an 2d array !!");
-        // }
+        if((!left)&&(!right)){
+            if((gentry->shape[0])||(gentry->shape[1])) yyerror("The identifier not matching with declaration !!");
+        }
+        else if((left)&&(!right)){
+            if((!gentry->shape[0])||(gentry->shape[1])) yyerror("The identifier not matching with declaration !!");
+            // if(left->val >= gentry->shape[0]) yyerror("Program trying to access out of the bound in an 1d array !!");
+        }
+        else if((left)&&(right)){
+            if((!gentry->shape[0])||(!gentry->shape[1])) yyerror("The identifier not matching with declaration !!");
+            // if((left->val >= gentry->shape[0])||(right->val >= gentry->shape[1])) yyerror("Program trying to access out of bound in an 2d array !!");
+        }
     }
-    else if((nodetype == pointerNode)&&((left->type != intPtrType)&&(left->type != strPtrType)))
+    else if((nodetype == pointerNode)&&((left->type != tLookup("intPtr"))&&(left->type != tLookup("strPtr"))))
         yyerror("Attempt to dereference a non-pointer variable !!");
     
 }
 
-struct tnode* createTree(int val, int type, char* c, int nodetype, struct tnode *left, struct tnode *right, 
+struct tnode* createTree(int val, struct typeTable* type, char* c, int nodetype, struct tnode *left, struct tnode *right, 
     struct tnode* exprVal,struct gsymbol* gentry, struct lsymbol* lentry,struct tnode* arglist){
 
     if(nodetype != idNode){
@@ -77,33 +92,36 @@ struct tnode* createTree(int val, int type, char* c, int nodetype, struct tnode 
 struct tnode* createStarNode(struct tnode* l){
     validate(pointerNode,l,NULL,NULL,NULL);
 
-    int type = (l->type == intPtrType) ? intType : strType;
+    struct typeTable* type = (l->type == tLookup("intPtr")) ? tLookup("intPtr") : tLookup("strPtr");
     return createTree(noNumber,type,NULL,pointerNode,l,NULL,NULL,NULL,NULL,NULL);
 }
 
 
 // Making & node for expression like "& identifier"
 struct tnode* createAddrNode(struct tnode* l){
-    int type = (l->type == intType) ? intPtrType : strPtrType;
+    struct typeTable* type = (l->type == tLookup("intPtr")) ? tLookup("intPtr") : tLookup("strPtr");
     return createTree(noNumber,type,NULL,addrNode,l,NULL,NULL,NULL,NULL,NULL);
 }
 
 struct tnode* createIdNode(char* name, struct tnode* left, struct tnode* right){
     struct lsymbol* lEntry = lLookup(name);
     struct gsymbol* gEntry = gLookup(name);
+
     if((!lEntry)&&(!gEntry)) yyerror("Identifier not found in global symbol table and local symbol table !!\n");
 
+    // If the id is present in lst
+    if((lEntry)&&(left||right)) yyerror("The identifier is not of array type !!");
     // If the id is present in gst and not in lst
     if((!lEntry)&&(gEntry)) {
         validate(idNode,left,right,NULL,gEntry);
     }
     
-    int type = lEntry ? lEntry->type : gEntry->type;
+    struct typeTable* type = lEntry ? lEntry->type : gEntry->type;
     return createTree(noNumber,type,name,idNode,left,right,NULL,gEntry,lEntry,NULL); 
 }
 
 struct tnode* createArgsNode(struct tnode* left){
-    int type = left->type;
+    struct typeTable* type = left->type;
     return createTree(noNumber,type,NULL,argsNode,left,NULL,NULL,NULL,NULL,NULL);
 }
 
@@ -140,17 +158,73 @@ struct tnode* createReturnNode(char* name, struct tnode* left){
     struct gsymbol* gnode = gLookup(name);
     // Validation
     if(gnode->type != left->type) yyerror("Return type is function is suppose to be %d but return expression is of type %d\n",gnode->type,left->type);
-    return createTree(noNumber,voidType,name,returnNode,left,NULL,NULL,NULL,NULL,NULL);
+    return createTree(noNumber,tLookup("void"),name,returnNode,left,NULL,NULL,NULL,NULL,NULL);
 }
 
 struct tnode* createMainNode(char* name, struct tnode* left){
-    return createTree(noNumber,voidType,name,mainNode,left,NULL,NULL,NULL,NULL,NULL);
+    return createTree(noNumber,tLookup("void"),name,mainNode,left,NULL,NULL,NULL,NULL,NULL);
 }
 
 struct tnode* createFunkNode(char* name, struct tnode* left){
-    return createTree(noNumber,voidType,name,funkNode,left,NULL,NULL,NULL,NULL,NULL);
+    return createTree(noNumber,tLookup("void"),name,funkNode,left,NULL,NULL,NULL,NULL,NULL);
 }
 
+struct tnode* makeDotOperatorNode1(char* n1, char* n2){
+    struct lsymbol* lEntry = lLookup(n1);
+    struct gsymbol* gEntry = gLookup(n1);
+
+    if(lEntry && gEntry) yyerror("Identifier not declared!!");
+    
+    struct typeTable* type = lEntry ? lEntry->type : gEntry->type;
+    struct fieldList* field = type->fields;
+    while(field){
+        if(strcmp(field->name,n2)==0){
+            struct tnode* left;
+            if(lEntry) left = createTree(noNumber,type,n1,idNode,NULL,NULL,NULL,NULL,lEntry,NULL);
+            else left = createTree(noNumber,type,n1,idNode,NULL,NULL,NULL,gEntry,NULL,NULL);
+
+            struct tnode* right = createTree(field->findex,field->type,n2,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL);
+            return createTree(noNumber,field->type,".",dotOperatorNode,left,right,NULL,NULL,NULL,NULL);
+        }
+        field = field->next;
+    }
+    yyerror("No matching field for the given identifier!!");
+    return NULL;
+}
+
+struct tnode* makeDotOperatorNode2(struct tnode* left, char* r){
+    struct typeTable* type = left->type;
+    struct fieldList* field = type->fields;
+    while(field){
+        if(strcmp(field->name,r)==0){
+            struct tnode* right = createTree(field->findex,field->type,r,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL);
+            return createTree(noNumber,field->type,".",dotOperatorNode,left,right,NULL,NULL,NULL,NULL);
+        }
+        field = field->next;
+    }
+    yyerror("No matching field for the given identifier!!");
+    return NULL;
+}
+
+struct tnode* makeAllocNode(struct tnode* left){
+    if((left->type == tLookup("int"))||(left->type == tLookup("intPtr"))||(left->type == tLookup("str"))||(left->type == tLookup("strPtr")))
+        yyerror("Expected an user defined type for alloc !!");
+    return createTree(noNumber,tLookup("void"),NULL,allocNode,left,NULL,NULL,NULL,NULL,NULL);
+}
+
+struct tnode* makeMemInitNode(void){
+    return createTree(noNumber,tLookup("void"),NULL,initNode,NULL,NULL,NULL,NULL,NULL,NULL);
+}
+
+struct tnode* makeFreeNode(struct tnode* left){
+    if((left->type == tLookup("int"))||(left->type == tLookup("intPtr"))||(left->type == tLookup("str"))||(left->type == tLookup("strPtr")))
+        yyerror("Expected an user defined type for freeing identifier !!");
+    return createTree(noNumber,tLookup("void"),NULL,freeNode,left,NULL,NULL,NULL,NULL,NULL);
+}
+
+struct tnode* makeNullNode(){
+    return createTree(0,tLookup("null"),NULL,nullNode,NULL,NULL,NULL,NULL,NULL,NULL);
+}
 // INITIALIZING FUNCTIONS.
 
 /*Functions related to global symbol table */
@@ -165,7 +239,7 @@ struct gsymbol* gLookup(char* name){
     return NULL;
 }
 
-void gInstall(char* name, int type, int ispointer, int shape0, int shape1, struct paramList* plist){
+void gInstall(char* name, struct typeTable* type, int ispointer, int shape0, int shape1, struct paramList* plist){
     if(gLookup(name)!=NULL)
         yyerror("Multiple variables with same name found");
 
@@ -193,14 +267,14 @@ void printGlobalSymbolTable(void){
 
     struct gsymbol* top = gst->top;
     while(top){
-        printf("name: %s, type: %d, size: %d, binding: %d, shape : %d %d, flabel : %d\n",top->name,top->type,top->size,top->binding,top->shape[0],top->shape[1],top->flabel);
+        printf("name: %s, type: %s, size: %d, binding: %d, shape : %d %d, flabel : %d\n",top->name,top->type->name,top->size,top->binding,top->shape[0],top->shape[1],top->flabel);
         top = top->next;
     }
 }
 
 
 /* Functions related to local symbol table */
-struct lsymbol* makeLSymbolNode(char* name, int type, int ispointer){
+struct lsymbol* makeLSymbolNode(char* name, struct typeTable* type, int ispointer){
     struct lsymbol* newEntry = (struct lsymbol*) malloc(sizeof(struct lsymbol));
     newEntry->name = name;
     newEntry->type = type;
@@ -228,14 +302,14 @@ void printLocalSymbolTable(void){
             struct paramList* pl = top->plist;
             printf("Parameters list : \n");
             while(pl) {
-                printf("name: %s, type: %d\n", pl->name, pl->type);
+                printf("name: %s, type: %s\n", pl->name, pl->type->name);
                 pl = pl->next;
             }
             
             struct lsymbol* lt = top->ltop;
             printf("Presenting local symbol table : \n");
             while(lt){
-                printf("name: %s, type: %d\n", lt->name, lt->type);
+                printf("name: %s, type: %s\n", lt->name, lt->type->name);
                 lt = lt->next;
             }
         }
@@ -244,9 +318,9 @@ void printLocalSymbolTable(void){
 }
 
 /* Functions related to paramlist */
-struct paramList* makeParamNode(int type, char* name, int ispointer){
+struct paramList* makeParamNode(struct typeTable* type, char* name, int ispointer){
     struct paramList* newEntry = (struct paramList*) malloc(sizeof(struct paramList));
-    if(ispointer) newEntry->type = (type == intType) ? intPtrType : strPtrType;
+    if(ispointer) newEntry->type = (type == tLookup("int")) ? tLookup("intPtr") : tLookup("strPtr");
     else newEntry->type = type;
     newEntry->name = name;
     newEntry->next = NULL;
@@ -254,97 +328,89 @@ struct paramList* makeParamNode(int type, char* name, int ispointer){
 }
 
 
-// To evaluate expression tree by recursion..
-int evaluate(struct tnode *t){
-    if(!t) return -1;
-    int temp;
+/* Functions related to typeTable */
+void createTypeTable(void){
+    // Installing default data types
+    tInstall("int", 1, NULL);
+    tInstall("intPtr", 1, NULL);
+    tInstall("str", 1, NULL);
+    tInstall("strPtr", 1, NULL);
 
-    switch(t->nodetype){
+    // Installing special data types
+    tInstall("bool", 1, NULL);
+    tInstall("null", 1, NULL);
+    tInstall("void", 1, NULL);
+}                                
 
-        case addNode : return evaluate(t->left) + evaluate(t->right);
+void tInstall(char* name, int size, struct fieldList* fields){
+    struct typeTable* type = (struct typeTable*) malloc(sizeof(struct typeTable));
+    type->name = name;
+    type->size = size;
+    type->fields = fields;
+    type->next = NULL;
 
-        case subNode : return evaluate(t->left) - evaluate(t->right);
-
-        case mulNode : return evaluate(t->left) * evaluate(t->right);
-
-        case divNode : return evaluate(t->left) / evaluate(t->right);
-
-        case lessNode : return (evaluate(t->left) < evaluate(t->right));
-
-        case greaterNode : return (evaluate(t->left) > evaluate(t->right));
-
-        case lessEqualNode : return (evaluate(t->left) <= evaluate(t->right));
-
-        case greaterEqualNode : return (evaluate(t->left) >= evaluate(t->right));
-
-        case notEqualNode : return (evaluate(t->left) != evaluate(t->right));
-
-        case equalNode : return (evaluate(t->left) == evaluate(t->right));
-            
-        case assignNode:    temp = (*(t->left->varname))-'a'; 
-                            varArr[temp] = evaluate(t->right);
-                            break;
-
-        case valNode :  return t->val;
-
-        case idNode :   temp = *(t->varname);
-                        return varArr[temp-'a'];
-
-        case readNode : 
-                        temp = *(t->left->varname);
-                        printf("%c = ",temp);
-                        scanf("%d",&varArr[temp-'a']);
-                        break;
-
-        case writeNode : 
-                        printf("%d\n", evaluate(t->left));
-                        break;
-
-        case emptyNode :    
-                        temp = evaluate(t->left);
-                        temp = evaluate(t->right);
-                        break;
-
-        case ifElseNode : 
-                        temp = (evaluate(t->exprVal)) ? evaluate(t->left) : evaluate(t->right);
-                        break;
-
-        case whileNode : 
-                        while(evaluate(t->exprVal)){
-                            evaluate(t->left);
-                        }
-                        break;
-
-        case doWhileNode : 
-                        do{
-                            evaluate(t->left);
-                        } while(evaluate(t->exprVal));
-                        break;
-
-        case repeatUntilNode :
-                        do{
-                            evaluate(t->left);
-                        } while(!evaluate(t->exprVal));
-                        break;
+    // Initialize the findex attribute of each field present in fieldlist
+    struct fieldList* temp = fields; int val=0;
+    while(temp){
+        temp->findex = val++;
+        temp = temp->next;
     }
-    return -1;
+
+    // Installing the node to the top of type table
+    type->next = ttt->top;
+    ttt->top = type;
+}                                                                  
+struct typeTable* tLookup(char* name){
+    struct typeTable* type = ttt->top;
+    while(type){
+        if(strcmp(type->name, name)==0) return type;
+        type = type->next;
+    }
+    return NULL;
+}                                                                                          
+struct fieldList* fLookup(struct typeTable* type, char* name){
+    struct fieldList* field = type->fields;
+    while(field){
+        if(strcmp(field->name, name)==0) return field;
+        field = field->next;
+    }
+    return NULL;
+}
+
+// Assuming that the size attribute of typeTable has an valid size
+int getSize(struct typeTable* type){
+    return type->size;
+}  
+
+struct fieldList* makeFieldNode(char* name, struct typeTable* type){
+    struct fieldList* field = (struct fieldList*) malloc(sizeof(struct fieldList));
+    field->name = name;
+    field->type = type;
+    field->findex = undefined;
+    field->next = NULL;
+
+    return field;
+}
+
+void printTypeTable(void){
+    struct typeTable* top = ttt->top;
+    while(top){
+        printf("Name: %s, size: %d\n",top->name,top->size);
+        if(top->fields){
+            printf("The fieldlist of %s is as follows:\n",top->name);
+            struct fieldList* fl = top->fields;
+            while(fl){
+                printf("Name: %s, findex: %d, type: %s\n",fl->name,fl->findex,fl->type->name);
+                fl = fl->next;
+            }
+            printf("\n");
+        }
+        top = top->next;
+    }
+    printf("\n");
 }
 
 // Printing nodetype values
-void printInfix(struct tnode* t){
-    if(!t) return;
-    printInfix(t->left);
-    printf("%d\n",t->nodetype);
-    printInfix(t->right);
-}
-
-void printPostfix(struct tnode* t){
-    if(!t) return;
-    printPostfix(t->left);
-    printPostfix(t->right);
-    printf("%d\n",t->nodetype);
-}
-
 void printPrefix(struct tnode* t){
     if(!t) return;
 
@@ -353,7 +419,7 @@ void printPrefix(struct tnode* t){
         struct tnode* temp = t->arglist;
         printf("printing args: ");
         while(temp) {
-            printf("%d ,",temp->type);
+            printf("%s ,",temp->type->name);
             temp=temp->arglist;
         }
         printf("\n");

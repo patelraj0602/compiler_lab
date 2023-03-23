@@ -87,7 +87,13 @@ extern int yydebug;
     MAIN = 293,
     RETURN = 294,
     AND = 295,
-    OR = 296
+    OR = 296,
+    TYPE = 297,
+    ENDTYPE = 298,
+    ALLOC = 299,
+    INITIALIZE = 300,
+    FREE = 301,
+    NULL_PTR = 302
   };
 #endif
 /* Tokens.  */
@@ -130,6 +136,12 @@ extern int yydebug;
 #define RETURN 294
 #define AND 295
 #define OR 296
+#define TYPE 297
+#define ENDTYPE 298
+#define ALLOC 299
+#define INITIALIZE 300
+#define FREE 301
+#define NULL_PTR 302
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -143,8 +155,9 @@ union YYSTYPE
   struct gsymbol* gnode;
   struct lsymbol* lnode;
   struct paramList* pl;
+  struct fieldList* fl;
 
-#line 148 "y.tab.h"
+#line 161 "y.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
