@@ -460,7 +460,7 @@ identifier : STAR identifier {$$ = createStarNode($2);}
   | ID '[' expr ']' '[' expr ']' {$$ = createIdNode($1,$3,$6);}
   | field {$$ = $1;}
 
-field : field '.' ID  {makeDotOperatorNode2($1,$3);}
+field : field '.' ID  {$$ = makeDotOperatorNode2($1,$3);}
   | ID '.' ID {$$ = makeDotOperatorNode1($1,$3);}
   ;
 

@@ -1,0 +1,27 @@
+type
+  bst{
+  int a;
+  bst left;
+  bst right;
+  }
+endtype
+
+decl
+  int in,opt;
+  bst insert(bst h, int key);
+  int inOrder(bst h);
+  int preOrder(bst h);
+  int postOrder(bst h);
+enddecl
+
+int main()
+{
+  decl
+  int val,flag;
+  bst Root;
+  enddecl
+
+  begin
+    Root.left.a = 5;
+  end
+}

@@ -173,7 +173,7 @@ struct tnode* makeDotOperatorNode1(char* n1, char* n2){
     struct lsymbol* lEntry = lLookup(n1);
     struct gsymbol* gEntry = gLookup(n1);
 
-    if(lEntry && gEntry) yyerror("Identifier not declared!!");
+    if((lEntry==NULL)&&(gEntry==NULL)) yyerror("Identifier not declared!!");
     
     struct typeTable* type = lEntry ? lEntry->type : gEntry->type;
     struct fieldList* field = type->fields;

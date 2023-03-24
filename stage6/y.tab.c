@@ -1719,7 +1719,7 @@ yyreduce:
       printGlobalSymbolTable();
       printLocalSymbolTable();
       printf("\n");
-      printPrefix((yyvsp[0].no));
+      // printPrefix($3);
       (yyval.no) = createTree(noNumber,tLookup("void"),NULL,emptyNode,(yyvsp[0].no),NULL,NULL,NULL,NULL,NULL);  
       // Call codegen
       helperFunction((yyval.no));
@@ -2488,7 +2488,7 @@ yyreduce:
 
   case 108:
 #line 463 "exprtree.y"
-                      {makeDotOperatorNode2((yyvsp[-2].no),(yyvsp[0].str));}
+                      {(yyval.no) = makeDotOperatorNode2((yyvsp[-2].no),(yyvsp[0].str));}
 #line 2493 "y.tab.c"
     break;
 
