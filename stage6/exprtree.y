@@ -87,6 +87,13 @@ program : gTypeBlock gDeclBlock fDefBlock mainBlock {
       // Call codegen
       helperFunction($$);  
     }
+  | gDeclBlock fDefBlock mainBlock {
+      printGlobalSymbolTable();
+      printLocalSymbolTable();
+      {$$ = createTree(noNumber,tLookup("void"),NULL,emptyNode,$2,$3,NULL,NULL,NULL,NULL);}
+      // Call codegen
+      helperFunction($$);
+    }
   ;
 
 // Grammer for supporting user defined types

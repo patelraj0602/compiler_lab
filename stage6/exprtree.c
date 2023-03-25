@@ -17,8 +17,8 @@ int operatorCheck(int nodeType){
 }
 
 void validate(int nodetype, struct tnode* left, struct tnode* right, struct tnode* exprVal,struct gsymbol* gentry){
-    // For null node
     if(nodetype == equalNode || nodetype == notEqualNode){
+        // For null node
         if(right->type == tLookup("null")){
             if((left->type == tLookup("int"))||(left->type == tLookup("str"))||(left->type == tLookup("bool"))||(left->type == tLookup("void")))
                 yyerror("null is only compatible with pointer data types!!");
@@ -29,6 +29,7 @@ void validate(int nodetype, struct tnode* left, struct tnode* right, struct tnod
     else if(operatorCheck(nodetype) && ((left->type != tLookup("int"))||(right->type != tLookup("int"))))
         yyerror("Integer type mismatch !!");
     else if(nodetype == assignNode){
+        // For null node
         if(right->type == tLookup("null")){
             if((left->type == tLookup("int"))||(left->type == tLookup("str")))
                 yyerror("null is only compatible with pointer data types!!");
@@ -92,14 +93,22 @@ struct tnode* createTree(int val, struct typeTable* type, char* c, int nodetype,
 struct tnode* createStarNode(struct tnode* l){
     validate(pointerNode,l,NULL,NULL,NULL);
 
-    struct typeTable* type = (l->type == tLookup("intPtr")) ? tLookup("intPtr") : tLookup("strPtr");
+    struct typeTable* type;
+    if(l->type == tLookup("intPtr")) type = tLookup("int");
+    else if(l->type == tLookup("strPtr")) type = tLookup("str");
+    else yyerror("You can only dereference an intptr or strptr !!\n");
+
     return createTree(noNumber,type,NULL,pointerNode,l,NULL,NULL,NULL,NULL,NULL);
 }
 
 
 // Making & node for expression like "& identifier"
 struct tnode* createAddrNode(struct tnode* l){
-    struct typeTable* type = (l->type == tLookup("intPtr")) ? tLookup("intPtr") : tLookup("strPtr");
+
+    struct typeTable* type;
+    if(l->type == tLookup("int")) type = tLookup("intPtr");
+    else if(l->type == tLookup("str")) type = tLookup("strPtr");
+    else yyerror("Pointers are supported only for int and str !!\n");
     return createTree(noNumber,type,NULL,addrNode,l,NULL,NULL,NULL,NULL,NULL);
 }
 
@@ -145,7 +154,13 @@ struct tnode* createCallerNode(char* name, struct tnode* arglist){
 
     while(pl || ag){
         if((!pl)||(!ag)) yyerror("No of arguments of caller and calle does not match !!");
-        if(pl->type != ag->type) yyerror("Type mismatch of the arguments between caller and calle function !!");
+
+        // Type Checking
+        if(ag->type == tLookup("null")){
+            if((pl->type)==tLookup("int")||(pl->type)==tLookup("str"))
+                yyerror("Type mismatch of the arguments between caller and calle function !!");
+        }
+        else if(pl->type != ag->type) yyerror("Type mismatch of the arguments between caller and calle function !!");
         pl = pl->next;
         ag = ag->arglist;
     }
@@ -156,8 +171,13 @@ struct tnode* createCallerNode(char* name, struct tnode* arglist){
 
 struct tnode* createReturnNode(char* name, struct tnode* left){
     struct gsymbol* gnode = gLookup(name);
-    // Validation
-    if(gnode->type != left->type) yyerror("Return type is function is suppose to be %d but return expression is of type %d\n",gnode->type,left->type);
+
+    // Type Checking
+    if(left->type == tLookup("null")){
+        if((left->type)==tLookup("int")||(left->type)==tLookup("str"))
+            yyerror("Return type of declaration does not match with initialization !!\n");
+    }
+    else if(gnode->type != left->type) yyerror("Return type of declaration does not match with initialization !!\n");
     return createTree(noNumber,tLookup("void"),name,returnNode,left,NULL,NULL,NULL,NULL,NULL);
 }
 
