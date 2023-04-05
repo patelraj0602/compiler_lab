@@ -1,0 +1,96 @@
+type
+    bst{
+        int a;
+        bst left;
+        bst right;
+    }
+endtype
+class
+    bstclass{
+        decl
+            bst root;
+            int init();
+            bst getroot();
+            int setroot(bst n1);
+            bst getnode(int key);
+            bst insert(bst h, int key);
+            int inOrder_fun(bst h);
+            int preOrder_fun(bst h);
+            int postOrder_fun(bst h);
+        enddecl
+        int init(){
+            decl
+            enddecl
+            begin
+            end
+        }
+        bst getroot(){
+            decl
+            enddecl
+            begin
+            end
+        }
+        int setroot(bst n1){
+            decl
+            enddecl
+            begin
+            end
+        }
+        bst getnode(int key){
+            decl
+                bst temp;
+            enddecl
+            begin
+            end
+        }
+        bst insert(bst h, int key){
+            decl
+            enddecl
+            begin
+            end
+        }
+        int inOrder_fun(bst h){
+            decl
+                int in;
+            enddecl
+            begin
+            end
+        }
+        int preOrder_fun(bst h){
+            decl
+                int in;
+            enddecl
+            begin
+            end
+        }
+        int postOrder_fun(bst h){
+            decl
+                int in;
+            enddecl
+            begin
+            end
+        }
+    }
+endclass
+decl
+    bstclass obj, obj2;
+    int testFunck(int a), temp;
+enddecl
+
+int testFunck(int a){
+  decl
+    int var0,var1;
+    str sr0,str1;
+  enddecl
+  begin
+  end
+}
+
+int main(){
+    decl
+        bst Root;
+        int x,in,val;
+    enddecl
+    begin
+    end
+}

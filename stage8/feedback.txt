@@ -1,0 +1,2 @@
+change lst->name to lst->type to do the type checking for return easily
+Make changes for return node

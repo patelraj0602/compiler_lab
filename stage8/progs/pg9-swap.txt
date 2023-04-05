@@ -1,0 +1,26 @@
+decl
+    int swap(int* n, int* m);
+enddecl
+
+int swap(int* n, int* m){
+    decl
+        int res;
+    enddecl
+    begin
+        res = *m;
+        *m = *n;
+        *n = res;
+        return res;
+    end
+}
+int main(){
+    decl
+        int r1,r2;
+    enddecl
+    begin
+        read(r1); read(r2);
+        swap(&r1,&r2);
+        write(r1); write(r2);
+        return 0;
+    end
+}
