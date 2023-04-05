@@ -1,27 +1,55 @@
 type
-  bst{
-  int a;
-  bst left;
-  bst right;
-  }
+    bst{
+        int a;
+        bst left;
+        bst right;
+    }
 endtype
+class
+    bstclass{
+        decl
+            bst root;
+            int init();
+            bst getroot();
+            int setroot(bst n1);
+            bst getnode(int key);
+            bst insert(bst h, int key);
+            int inOrder_fun(bst h);
+            int preOrder_fun(bst h);
+            int postOrder_fun(bst h);
+        enddecl
 
-decl
-  int in,opt;
-  bst insert(bst h, int key);
-  int inOrder(bst h);
-  int preOrder(bst h);
-  int postOrder(bst h);
-enddecl
+        bst insert(bst h, int key){
+            decl
+            enddecl
+            begin
+                if (h == null) then
+                    h = self.getnode(key);
+                else
+                    if (key < h.a) then
+                        h.left = self.insert(h.left, key);
+                    else
+                        if (key > h.a) then
+                            h.right = self.insert(h.right, key);
+                        endif;
+                    endif;
+                endif;
+                return h;
+            end
+        }
 
-int main()
-{
-  decl
-  int val,flag;
-  bst Root;
-  enddecl
-
-  begin
-    Root.left.a = 5;
-  end
-}
+        int postOrder_fun(bst h){
+            decl
+                int in;
+            enddecl
+            begin
+                if(h!= null) then
+                    in=self.postOrder_fun(h.left);
+                    in=self.postOrder_fun(h.right);
+                    write(h.a);
+                endif;
+                return 1;
+            end
+        }
+    }
+endclass

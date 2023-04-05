@@ -46,9 +46,45 @@
 #define initNode 43
 #define freeNode 44
 #define nullNode 45
+#define selfNode 46
+#define definedDone 47
 
 int varArr[26];
 
+// attribute list for class
+struct attrList{
+    char* name;                         // name of the field
+    int findex;                         // position of the field
+    struct typeTable* type;             // pointer to the type table
+    struct classTable* ctype;           // pointer to the class containing the field
+    struct attrList* next;              // pointer to next fieldlist entry;
+};
+
+// member function list for class
+struct memberFuncList{
+    char* name;                         // name of the member function in the class
+    struct typeTable* type;             // This is return type of member function
+    struct paramList* plist;            // pointer to the head of the formal parmeter list
+    struct lsymbol* ltop;               // pointer to the top of local symbol table.
+    int funcpos;                        // position of the function in the class table
+    int flabel;                         // a label for identifying the starting address of the function's code in the memory
+    struct memberFuncList* next;        // Pointer to the next memberfunclist entry
+};
+
+// For class table: For storing used defined classes
+struct classTable{
+    char* name;                         // name of the class
+    struct attrList* memfield;          // Pointer to fieldList
+    struct memberFuncList* vfuncptr;    // Pointer to the member func list
+    struct classTable* parentptr;       // Pointer to the parent's class table
+    int classindex;                     // Position of the class in the virtual function table
+    int attrcount;                      // count of fields
+    int methodcount;                    // count of methods
+    struct classTable* next;            // Pointer to the next class entry
+};
+
+
+// For type table: It basically stores basic types and user defined types
 struct typeTable{
     char* name;                 // Name of the type
     int size;                   // Size of the type
@@ -60,6 +96,7 @@ struct typeTableList{
     struct typeTable* top;
 };
 
+// For fieldList of an user-defined type(struct)
 struct fieldList{
   char *name;                   //name of the field
   int findex;                   //the position of the field in the field list
@@ -67,16 +104,19 @@ struct fieldList{
   struct fieldList *next;       //pointer to the next field
 };
 
-
+// paramList for function arguments
 struct paramList{
     char* name;                 // name of parameter
     struct typeTable* type;     // type of parameter
     struct paramList* next;
 };
 
+// To change: add pointer the the class table attribute in this
+// global symbol table
 struct gsymbol {
     char* name;                 // name of the variable
     struct typeTable* type;     // type of the variable
+    struct classTable* ctype;   // pointer to the entry in class table i.e. name of class
     int ispointer;              // Tells whether the type data type is pointer or not
     int size;                   // size of the type of the variable
     int binding;                // stores the static memory address allocated to the variable
@@ -84,9 +124,11 @@ struct gsymbol {
     struct paramList* plist;    // Points to the list of parameters of the function
     struct lsymbol* ltop;       // Points to the top of local symbol table for any particular function.
     int flabel;                 // Label number of the function
+    int status;                 // helper to determined wheter the type and ctype are defined or undefined
     struct gsymbol *next;
 };
 
+// local symbol table
 struct lsymbol {
     char* name;                 // name of the variable
     struct typeTable* type;     // type of variable
@@ -95,6 +137,7 @@ struct lsymbol {
     struct lsymbol* next;       
 };
 
+// tree node
 typedef struct tnode { 
     int val;                    // value of a number for NUM nodes.
     struct typeTable* type;     // type of variable
@@ -105,6 +148,11 @@ typedef struct tnode {
     struct gsymbol* gentry; 
     struct lsymbol* lentry;
     struct tnode* arglist;
+
+    // Few data structures to support class
+    struct classTable* ctype;
+    struct paramList* plist;
+    struct methodFuncList* mlist;
 }tnode; 
 
 
@@ -116,16 +164,33 @@ struct globalSymbolTable{
 // Pointer to the top of local symbol table
 struct localSymbolTable{
     struct lsymbol* top;
+    struct typeTable* type;
     char* name;
+};
+
+// Pointer to the top of class table
+struct classTableList{
+    struct classTable* top;
 };
 
 struct globalSymbolTable* gst;                          // Pointer to the top of global symbol table
 struct localSymbolTable* lst;                           // Pointer to the top of local symbol table for curring running function
 struct typeTableList* ttt;                              // Pointer to the top of type table list
+struct classTableList* ctt;                             // Pointer to the top of class table
+
 /* Global variables */                                           
 int binding;                                                
 int curType;                                            
 int fLabel; 
+char* curClass;
+
+// Associated methods of class table
+void cInstall(char* name, char* parentName);
+struct classTable* cLookup(char* name);
+void classAttrInstall(char* cname, char* typename, char* fieldname);
+void classMemInstall(char* cname, char* fname, char* type, struct paramList* plist);
+struct memberFuncList* classMemLookup(char* cname, char* fname);
+struct attrList* classAttrLookup(char* cname, char* aname);
 
 // Functions for paramlist
 struct paramList* makeParamNode(struct typeTable* type, char* name, int isPointer);
@@ -148,27 +213,34 @@ struct fieldList* makeFieldNode(char* name, struct typeTable* type);
 
 /*Create a node tnode*/
 void validate(int nodetype, struct tnode* left, struct tnode* right, struct tnode* exprVal,struct gsymbol* gentry);
-struct tnode* createTree(int val, struct typeTable* type, char* c, int nodetype, struct tnode *l, struct tnode *r, struct tnode* exprVal,struct gsymbol* gentry, struct lsymbol* lentry, struct tnode* arglist);
+struct tnode* createTree(int val, struct typeTable* type, char* c, int nodetype, struct tnode *l, struct tnode *r, 
+struct tnode* exprVal,struct gsymbol* gentry, struct lsymbol* lentry, struct tnode* arglist, struct classTable* ctype,struct paramList* plist);
 struct tnode* createStarNode(struct tnode* l);                                                                                                              
 struct tnode* createAddrNode(struct tnode* l);
 struct tnode* createIdNode(char* name, struct tnode* left, struct tnode* right);
 struct tnode* createArgsNode(struct tnode* left);
 struct tnode* createCallerNode(char* name, struct tnode* arglist);
-struct tnode* createReturnNode(char* name, struct tnode* left);
+struct tnode* createReturnNode(struct typeTable* type, struct tnode* left, char* name);
 struct tnode* createMainNode(char* name, struct tnode* left);
 struct tnode* createFunkNode(char* name, struct tnode* left);
+struct tnode* createMethodFunkNode(char* fname, struct tnode* left);
 struct tnode* makeDotOperatorNode1(char* n1, char* n2);
 struct tnode* makeDotOperatorNode2(struct tnode* left, char* r);
 struct tnode* makeAllocNode(struct tnode* left);
 struct tnode* makeMemInitNode(void);
 struct tnode* makeFreeNode(struct tnode* left);
 struct tnode* makeNullNode();
+struct tnode* makeMethodNode1(char* fname, struct tnode* arglist);
+struct tnode* makeMethodNode2(char* objname, char* fname, struct tnode* arglist);
+struct tnode* makeMethodNode3(struct tnode* left, char* fname, struct tnode* arglist);
+struct tnode* makeConnectorNode(struct tnode* left, struct tnode* right);
 int operatorCheck(int nodeType);
   
 // Printing different datastructures
 void printGlobalSymbolTable(void);                                                                                              // To print the global symbol table.
 void printLocalSymbolTable(void);
 void printTypeTable(void);
+void printClassTable(void);
 
 /*To evaluate an expression tree*/ 
 // int evaluate(struct tnode *t);

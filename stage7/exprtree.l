@@ -35,19 +35,24 @@ int number;
 "initialize"            {return INITIALIZE;}
 "free"                  {return FREE;}
 "null"                  {return NULL_PTR;}
+"class"                 {return CLASS;}
+"endclass"              {return ENDCLASS;}
+"new"                   {return NEW;}
+"delete"                {return DELETE;}
+"self"                  {return SELF;}
 "int"                   {yylval.str = strdup(yytext); return INT;}
 "str"                   {yylval.str = strdup(yytext); return STR;} 
-[a-zA-Z][a-zA-Z0-9]*    {yylval.str = strdup(yytext); return ID;} 
+[a-zA-Z][_a-zA-Z0-9]*    {yylval.str = strdup(yytext); return ID;} 
 [0-9]+                  {
                             number = atoi(yytext); 
-                            yylval.no = createTree(number,tLookup("int"),NULL,valNode,NULL,NULL,NULL,NULL,NULL,NULL); 
+                            yylval.no = createTree(number,tLookup("int"),NULL,valNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL); 
                             return NUM;
                         }
 ["]([^"\n]|\\(.|\n))*["] {
                             char* temp = malloc(yyleng -1);
                             memcpy(temp, yytext + 1, yyleng - 2);
                             temp[yyleng - 2] = 0; 
-                            yylval.no = createTree(noNumber,tLookup("str"),temp,strNode,NULL,NULL,NULL,NULL,NULL,NULL);
+                            yylval.no = createTree(noNumber,tLookup("str"),temp,strNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
                             return STRING; 
                         } 
 "+"                     {return PLUS;}  

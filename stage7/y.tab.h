@@ -93,7 +93,12 @@ extern int yydebug;
     ALLOC = 299,
     INITIALIZE = 300,
     FREE = 301,
-    NULL_PTR = 302
+    NULL_PTR = 302,
+    CLASS = 303,
+    ENDCLASS = 304,
+    NEW = 305,
+    DELETE = 306,
+    SELF = 307
   };
 #endif
 /* Tokens.  */
@@ -142,6 +147,11 @@ extern int yydebug;
 #define INITIALIZE 300
 #define FREE 301
 #define NULL_PTR 302
+#define CLASS 303
+#define ENDCLASS 304
+#define NEW 305
+#define DELETE 306
+#define SELF 307
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -157,7 +167,7 @@ union YYSTYPE
   struct paramList* pl;
   struct fieldList* fl;
 
-#line 161 "y.tab.h"
+#line 171 "y.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

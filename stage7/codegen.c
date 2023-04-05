@@ -505,20 +505,18 @@ int codeGen(struct tnode* t, FILE* targetFile){
         
         // Newly added
         case funkNode :
-                        gstValue = gLookup(t->varname);
-                        lst->top = gstValue->ltop;
-                        lst->name = gstValue->name;
+                        lst->top = t->lentry;
                         len1=0; len2=0;
 
                         // Add label for the function.
-                        fprintf(targetFile, "F%d :\n",gstValue->flabel);
+                        fprintf(targetFile, "F%d :\n",t->val);
                         
                         //Save base pointer
                         fprintf(targetFile, "PUSH BP\n");
                         fprintf(targetFile, "MOV BP, SP\n");
 
                         // Address binding for local variables and parameters
-                        lstValue = gstValue->ltop; i=0;
+                        lstValue = lst->top; i=0;
                         while(lstValue){
                             lstValue->binding = ++i;
                             len1++;
@@ -527,7 +525,7 @@ int codeGen(struct tnode* t, FILE* targetFile){
                         fprintf(targetFile, "ADD SP, %d\n",len1);
 
                         // Finding the no of parameters
-                        pl = gstValue->plist;
+                        pl = t->plist;
                         while(pl){
                             len2++;
                             pl = pl->next;
@@ -535,10 +533,10 @@ int codeGen(struct tnode* t, FILE* targetFile){
 
                         // Assigning values to the argument passed by the caller
                         fr = getReg();
-                        pl = gstValue->plist;
+                        pl = t->plist;
 
                         fprintf(targetFile, "MOV R%d, BP\n", fr);
-                        fprintf(targetFile, "SUB R%d, %d\n", fr,len2+2);
+                        fprintf(targetFile, "SUB R%d, %d\n", fr,len2+3);
 
                         for(i=0; i<len2; i++){
                             lstValue = lLookup(pl->name);
@@ -558,6 +556,7 @@ int codeGen(struct tnode* t, FILE* targetFile){
                         break;
 
         // Newly added
+        /* Need to change here for supporting methods for class */
         case callerNode :
                         // Pushing registers
                         for(i=0; i<=count; i++)
@@ -573,16 +572,19 @@ int codeGen(struct tnode* t, FILE* targetFile){
                             argNode = argNode->arglist;
                         }
 
+                        // Pushing self
+                        r1 = codeGen(t->left, targetFile);
+                        (r1>=0) ? fprintf(targetFile,"PUSH R%d\n",r1) : fprintf(targetFile,"PUSH R%d\n",0);  
+
                         // Pusing empty space for return value and calling function
                         fprintf(targetFile, "PUSH R%d\n", 0);
 
                         count = -1;
-                        gstValue = gLookup(t->varname);
-                        lb0 = gstValue->flabel;
-                        fprintf(targetFile, "CALL F%d\n", lb0);
+                        fprintf(targetFile, "CALL F%d\n", t->val);
 
-                        // Getting the return value from the function
+                        // Getting the return value from the function and poping self value
                         fprintf(targetFile, "POP R%d\n", functionRetReg);
+                        fprintf(targetFile, "POP R%d\n", 0);
 
                         // Poping the arguments from the program stack
                         argNode = t->arglist;
@@ -597,6 +599,7 @@ int codeGen(struct tnode* t, FILE* targetFile){
                         // Poping registers
                         for(i=count; i>=0; i--)
                             fprintf(targetFile, "POP R%d\n", i);
+
                         retReg = getReg();
                         fprintf(targetFile, "MOV R%d, R%d\n", retReg,functionRetReg);
                         
@@ -635,13 +638,11 @@ int codeGen(struct tnode* t, FILE* targetFile){
                         fprintf(targetFile, "MOV BP, %d\n", binding);
                         fprintf(targetFile, "MOV SP, %d\n", binding);
 
-                        // Find gstValue and setting lst for later use
-                        gstValue = gLookup(t->varname);
-                        lst->top = gstValue->ltop;
-                        lst->name = gstValue->name;
+                        // Setting the value of lst
+                        lst->top = t->lentry;
 
                         // Address binding for local variables and parameters
-                        lstValue = gstValue->ltop; len1=0; i=0;
+                        lstValue = lst->top; len1=0; i=0;
                         while(lstValue){
                             lstValue->binding = ++i;
                             ++len1;
@@ -664,6 +665,13 @@ int codeGen(struct tnode* t, FILE* targetFile){
         case fieldNode :
                         fr = getReg();
                         fprintf(targetFile, "MOV R%d, %d\n",fr,t->val);
+                        return fr;
+
+        case selfNode :
+                        fr = getReg();
+                        fprintf(targetFile, "MOV R%d, BP\n",fr);
+                        fprintf(targetFile, "SUB R%d, %d\n",fr,3);
+                        fprintf(targetFile, "MOV R%d, [R%d]\n",fr,fr);
                         return fr;
 
         case initNode :

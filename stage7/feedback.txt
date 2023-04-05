@@ -1,2 +1,2 @@
-=> support for null in functions. return type etc
-=> Check if pg13 gives correct output or not.
+change lst->name to lst->type to do the type checking for return easily
+Make changes for return node

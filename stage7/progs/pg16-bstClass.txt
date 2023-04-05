@@ -112,3 +112,30 @@ class
         }
     }
 endclass
+
+decl
+    bstclass obj;
+enddecl
+
+int main(){
+    decl
+        bst Root;
+        int x,in,val;
+    enddecl
+    begin
+        initialize();
+        obj = alloc();
+        x=obj.init();
+        read(val);
+        Root = obj.getroot();
+        while(val!=0) do
+            Root = obj.insert(Root,val);
+            read(val);
+        endwhile;
+        x = obj.setroot(Root);
+        in = obj.inOrder_fun(obj.getroot());
+        in = obj.preOrder_fun(obj.getroot());
+        in = obj.postOrder_fun(obj.getroot());
+        return 0;
+    end
+}

@@ -1,8 +1,8 @@
 // Comment the #include files before executing the code
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h> 
-#include "exprtree.h"
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <string.h> 
+// #include "exprtree.h"
 
 /*
 / assignNode : You can only do assignment if both side have same type. 
@@ -55,10 +55,12 @@ void validate(int nodetype, struct tnode* left, struct tnode* right, struct tnod
         }
         else if((left)&&(!right)){
             if((!gentry->shape[0])||(gentry->shape[1])) yyerror("The identifier not matching with declaration !!");
+            // The below check must be done at runtime
             // if(left->val >= gentry->shape[0]) yyerror("Program trying to access out of the bound in an 1d array !!");
         }
         else if((left)&&(right)){
             if((!gentry->shape[0])||(!gentry->shape[1])) yyerror("The identifier not matching with declaration !!");
+            // The below check must be done at runtime
             // if((left->val >= gentry->shape[0])||(right->val >= gentry->shape[1])) yyerror("Program trying to access out of bound in an 2d array !!");
         }
     }
@@ -68,7 +70,8 @@ void validate(int nodetype, struct tnode* left, struct tnode* right, struct tnod
 }
 
 struct tnode* createTree(int val, struct typeTable* type, char* c, int nodetype, struct tnode *left, struct tnode *right, 
-    struct tnode* exprVal,struct gsymbol* gentry, struct lsymbol* lentry,struct tnode* arglist){
+    struct tnode* exprVal,struct gsymbol* gentry, struct lsymbol* lentry,struct tnode* arglist, struct classTable* ctype,
+    struct paramList* plist){
 
     if(nodetype != idNode){
         validate(nodetype,left,right,exprVal,gentry);    
@@ -85,7 +88,8 @@ struct tnode* createTree(int val, struct typeTable* type, char* c, int nodetype,
     temp->gentry = gentry;
     temp->lentry = lentry;
     temp->arglist = arglist;
-
+    temp->ctype = ctype;
+    temp->plist = plist;
     return temp;
 }
 
@@ -98,7 +102,7 @@ struct tnode* createStarNode(struct tnode* l){
     else if(l->type == tLookup("strPtr")) type = tLookup("str");
     else yyerror("You can only dereference an intptr or strptr !!\n");
 
-    return createTree(noNumber,type,NULL,pointerNode,l,NULL,NULL,NULL,NULL,NULL);
+    return createTree(noNumber,type,NULL,pointerNode,l,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 }
 
 
@@ -109,7 +113,7 @@ struct tnode* createAddrNode(struct tnode* l){
     if(l->type == tLookup("int")) type = tLookup("intPtr");
     else if(l->type == tLookup("str")) type = tLookup("strPtr");
     else yyerror("Pointers are supported only for int and str !!\n");
-    return createTree(noNumber,type,NULL,addrNode,l,NULL,NULL,NULL,NULL,NULL);
+    return createTree(noNumber,type,NULL,addrNode,l,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 }
 
 struct tnode* createIdNode(char* name, struct tnode* left, struct tnode* right){
@@ -126,31 +130,21 @@ struct tnode* createIdNode(char* name, struct tnode* left, struct tnode* right){
     }
     
     struct typeTable* type = lEntry ? lEntry->type : gEntry->type;
-    return createTree(noNumber,type,name,idNode,left,right,NULL,gEntry,lEntry,NULL); 
+    return createTree(noNumber,type,name,idNode,left,right,NULL,gEntry,lEntry,NULL,NULL,NULL); 
 }
 
 struct tnode* createArgsNode(struct tnode* left){
+    // According to language specification the function cannot have object as return type
     struct typeTable* type = left->type;
-    return createTree(noNumber,type,NULL,argsNode,left,NULL,NULL,NULL,NULL,NULL);
+    return createTree(noNumber,type,NULL,argsNode,left,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 }
 
 struct tnode* createCallerNode(char* name, struct tnode* arglist){
     struct gsymbol* gnode = gLookup(name);
+    if(!gnode) yyerror("The caller function not found in global symbol table");
+
     struct paramList* pl = gnode->plist;
     struct tnode* ag = arglist;
-
-    // To checkout the parameter and argument list
-    // printf("Printing paramerters list\n");
-    // while(pl){
-    //     printf("%d ,", pl->type);
-    //     pl = pl->next;
-    // }
-    // printf("\nPrinting Argument list list\n");
-    // while(ag){
-    //     printf("%d ,", ag->type);
-    //     ag = ag->arglist;
-    // }
-    // printf("\n");
 
     while(pl || ag){
         if((!pl)||(!ag)) yyerror("No of arguments of caller and calle does not match !!");
@@ -166,27 +160,32 @@ struct tnode* createCallerNode(char* name, struct tnode* arglist){
     }
 
     // The type of the caller node is return type of function
-    return createTree(noNumber,gnode->type,name,callerNode,NULL,NULL,NULL,NULL,NULL,arglist);
+    return createTree(gnode->flabel,gnode->type,name,callerNode,NULL,NULL,NULL,NULL,gnode->ltop,arglist,NULL,NULL);
 }
 
-struct tnode* createReturnNode(char* name, struct tnode* left){
-    struct gsymbol* gnode = gLookup(name);
-
+struct tnode* createReturnNode(struct typeTable* type, struct tnode* left, char* name){
     // Type Checking
     if(left->type == tLookup("null")){
-        if((left->type)==tLookup("int")||(left->type)==tLookup("str"))
+        if(type==tLookup("int")||type==tLookup("str"))
             yyerror("Return type of declaration does not match with initialization !!\n");
     }
-    else if(gnode->type != left->type) yyerror("Return type of declaration does not match with initialization !!\n");
-    return createTree(noNumber,tLookup("void"),name,returnNode,left,NULL,NULL,NULL,NULL,NULL);
+    else if(type != left->type) yyerror("Return type of declaration does not match with initialization !!\n");
+    return createTree(noNumber,tLookup("void"),name,returnNode,left,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 }
 
 struct tnode* createMainNode(char* name, struct tnode* left){
-    return createTree(noNumber,tLookup("void"),name,mainNode,left,NULL,NULL,NULL,NULL,NULL);
+    struct gsymbol* gnode = gLookup(name);
+    return createTree(noNumber,tLookup("void"),name,mainNode,left,NULL,NULL,NULL,gnode->ltop,NULL,NULL,NULL);
 }
 
 struct tnode* createFunkNode(char* name, struct tnode* left){
-    return createTree(noNumber,tLookup("void"),name,funkNode,left,NULL,NULL,NULL,NULL,NULL);
+    struct gsymbol* gnode = gLookup(name);
+    return createTree(gnode->flabel,tLookup("void"),name,funkNode,left,NULL,NULL,NULL,gnode->ltop,NULL,NULL,gnode->plist);
+}
+
+struct tnode* createMethodFunkNode(char* fname, struct tnode* left){
+    struct memberFuncList* mem = classMemLookup(curClass, fname);
+    return createTree(mem->flabel,tLookup("void"),fname,funkNode,left,NULL,NULL,NULL,mem->ltop,NULL,NULL,mem->plist);
 }
 
 struct tnode* makeDotOperatorNode1(char* n1, char* n2){
@@ -195,16 +194,20 @@ struct tnode* makeDotOperatorNode1(char* n1, char* n2){
 
     if((lEntry==NULL)&&(gEntry==NULL)) yyerror("Identifier not declared!!");
     
+    if((gEntry)&&(gEntry->ctype))
+        yyerror("The attribute of the class cannot be accessed from outside of the class !!\n");
+
+    // Identified an user defined data type
     struct typeTable* type = lEntry ? lEntry->type : gEntry->type;
     struct fieldList* field = type->fields;
     while(field){
         if(strcmp(field->name,n2)==0){
             struct tnode* left;
-            if(lEntry) left = createTree(noNumber,type,n1,idNode,NULL,NULL,NULL,NULL,lEntry,NULL);
-            else left = createTree(noNumber,type,n1,idNode,NULL,NULL,NULL,gEntry,NULL,NULL);
+            if(lEntry) left = createTree(noNumber,type,n1,idNode,NULL,NULL,NULL,NULL,lEntry,NULL,NULL,NULL);
+            else left = createTree(noNumber,type,n1,idNode,NULL,NULL,NULL,gEntry,NULL,NULL,NULL,NULL);
 
-            struct tnode* right = createTree(field->findex,field->type,n2,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL);
-            return createTree(noNumber,field->type,".",dotOperatorNode,left,right,NULL,NULL,NULL,NULL);
+            struct tnode* right = createTree(field->findex,field->type,n2,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+            return createTree(noNumber,field->type,".",dotOperatorNode,left,right,NULL,NULL,NULL,NULL,NULL,NULL);
         }
         field = field->next;
     }
@@ -217,8 +220,8 @@ struct tnode* makeDotOperatorNode2(struct tnode* left, char* r){
     struct fieldList* field = type->fields;
     while(field){
         if(strcmp(field->name,r)==0){
-            struct tnode* right = createTree(field->findex,field->type,r,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL);
-            return createTree(noNumber,field->type,".",dotOperatorNode,left,right,NULL,NULL,NULL,NULL);
+            struct tnode* right = createTree(field->findex,field->type,r,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+            return createTree(noNumber,field->type,".",dotOperatorNode,left,right,NULL,NULL,NULL,NULL,NULL,NULL);
         }
         field = field->next;
     }
@@ -226,26 +229,245 @@ struct tnode* makeDotOperatorNode2(struct tnode* left, char* r){
     return NULL;
 }
 
+struct tnode* makeDotOperatorNode3(char* attr){
+    struct attrList* attribute = classAttrLookup(curClass,attr);
+    if(!attribute) 
+        yyerror("attribute not present in field list of class !!\n");
+
+    struct tnode* left = createTree(noNumber,tLookup("void"),NULL,selfNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+    struct tnode* right = createTree(attribute->findex,attribute->type,NULL,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL,attribute->ctype,NULL);
+    return createTree(noNumber,attribute->type,NULL,dotOperatorNode,left,right,NULL,NULL,NULL,NULL,attribute->ctype,NULL);
+}
+
 struct tnode* makeAllocNode(struct tnode* left){
     if((left->type == tLookup("int"))||(left->type == tLookup("intPtr"))||(left->type == tLookup("str"))||(left->type == tLookup("strPtr")))
         yyerror("Expected an user defined type for alloc !!");
-    return createTree(noNumber,tLookup("void"),NULL,allocNode,left,NULL,NULL,NULL,NULL,NULL);
+    return createTree(noNumber,tLookup("void"),NULL,allocNode,left,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 }
 
 struct tnode* makeMemInitNode(void){
-    return createTree(noNumber,tLookup("void"),NULL,initNode,NULL,NULL,NULL,NULL,NULL,NULL);
+    return createTree(noNumber,tLookup("void"),NULL,initNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 }
 
 struct tnode* makeFreeNode(struct tnode* left){
     if((left->type == tLookup("int"))||(left->type == tLookup("intPtr"))||(left->type == tLookup("str"))||(left->type == tLookup("strPtr")))
         yyerror("Expected an user defined type for freeing identifier !!");
-    return createTree(noNumber,tLookup("void"),NULL,freeNode,left,NULL,NULL,NULL,NULL,NULL);
+    return createTree(noNumber,tLookup("void"),NULL,freeNode,left,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+}
+
+struct tnode* makeConnectorNode(struct tnode* left, struct tnode* right){
+    return createTree(noNumber,tLookup("void"),NULL,emptyNode,left,right,NULL,NULL,NULL,NULL,NULL,NULL);
 }
 
 struct tnode* makeNullNode(){
-    return createTree(0,tLookup("null"),NULL,nullNode,NULL,NULL,NULL,NULL,NULL,NULL);
+    return createTree(0,tLookup("null"),NULL,nullNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+}
+
+// Some hardcoding is present in this 3 different method node function: Change it later.
+struct tnode* makeMethodNode1(char* fname, struct tnode* arglist){
+    struct memberFuncList* mnode = classMemLookup(curClass,fname);
+    if(!mnode) yyerror("Method not found for the specified class\n");
+
+    struct paramList* pl = mnode->plist;
+    struct tnode* ag = arglist;
+
+    while(pl||ag){
+        if((!pl)||(!ag)) 
+            yyerror("No of argument mismatch between declaration and initialization of method of an class !!\n");
+        //Type Checking
+        if(ag->type == tLookup("null")){
+            if((pl->type)==tLookup("int")||(pl->type)==tLookup("str"))
+                yyerror("Type mismatch of the arguments between caller and calle of the method of an class!!\n");
+        }
+        else if(pl->type != ag->type)
+            yyerror("Type mismatch of the arguments between caller and calle of the method of an class!!\n");
+        pl = pl->next;
+        ag = ag->arglist;
+    }
+
+    struct tnode* left = createTree(noNumber,tLookup("void"),NULL,selfNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+    return createTree(mnode->flabel,mnode->type,mnode->name,callerNode,left,NULL,NULL,NULL,mnode->ltop,arglist,NULL,mnode->plist);
+}
+
+struct tnode* makeMethodNode2(char* objname, char* fname, struct tnode* arglist){
+    // Extracting the class name for the object
+    struct gsymbol* gnode = gLookup(objname);
+    char* cname = gnode->ctype->name;
+    struct memberFuncList* mnode = classMemLookup(cname,fname);
+
+    if(!mnode) yyerror("Method not found for the specified class\n");
+
+    struct paramList* pl = mnode->plist;
+    struct tnode* ag = arglist;
+
+    while(pl||ag){
+        if((!pl)||(!ag)) 
+            yyerror("No of argument mismatch between declaration and initialization of method of an class !!\n");
+        //Type Checking
+        if(ag->type == tLookup("null")){
+            if((pl->type)==tLookup("int")||(pl->type)==tLookup("str"))
+                yyerror("Type mismatch of the arguments between caller and calle of the method of an class!!\n");
+        }
+        else if(pl->type != ag->type)
+            yyerror("Type mismatch of the arguments between caller and calle of the method of an class!!\n");
+        pl = pl->next;
+        ag = ag->arglist;
+    }
+
+    struct tnode* left = createTree(noNumber,NULL,NULL,idNode,NULL,NULL,NULL,gLookup(objname),NULL,NULL,NULL,NULL);
+    return createTree(mnode->flabel,mnode->type,mnode->name,callerNode,left,NULL,NULL,NULL,mnode->ltop,arglist,NULL,mnode->plist);
+}
+
+struct tnode* makeMethodNode3(struct tnode* left, char* fname, struct tnode* arglist){
+    char* cname = left->ctype->name;
+    struct memberFuncList* mnode = classMemLookup(cname,fname);
+
+    if(!mnode) yyerror("Method not found for specified class\n");
+    struct paramList* pl = mnode->plist;
+    struct tnode* ag = arglist;
+
+    while(pl||ag){
+        if((!pl)||(!ag)) 
+            yyerror("No of argument mismatch between declaration and initialization of method of an class !!\n");
+        //Type Checking
+        if(ag->type == tLookup("null")){
+            if((pl->type)==tLookup("int")||(pl->type)==tLookup("str"))
+                yyerror("Type mismatch of the arguments between caller and calle of the method of an class!!\n");
+        }
+        else if(pl->type != ag->type)
+            yyerror("Type mismatch of the arguments between caller and calle of the method of an class!!\n");
+        pl = pl->next;
+        ag = ag->arglist;
+    }
+    return createTree(mnode->flabel,mnode->type,mnode->name,callerNode,left,NULL,NULL,NULL,mnode->ltop,arglist,NULL,mnode->plist);
 }
 // INITIALIZING FUNCTIONS.
+
+
+/* Functions related to class table, member functions and attribute list */
+struct classTable* cLookup(char* name){
+    struct classTable* top = ctt->top;
+    while(top){
+        if(strcmp(top->name,name)==0) return top;
+        top = top->next;
+    }
+    return NULL;
+} 
+
+void cInstall(char* name, char* parentName){
+    if(cLookup(name)) yyerror("Multiple class with same name !!\n");
+    else if(tLookup(name)) yyerror("Class name conflicting already declared user defined type !!\n");
+
+    struct classTable* newEntry = (struct classTable*) malloc(sizeof(struct classTable));
+    
+    newEntry->name = name;
+    newEntry->memfield = NULL;
+    newEntry->vfuncptr = NULL;
+    newEntry->parentptr = NULL;
+    newEntry->classindex = undefined;
+    newEntry->attrcount = undefined;
+    newEntry->methodcount = undefined;
+    newEntry->next = NULL;
+
+    newEntry->next = ctt->top;
+    ctt->top = newEntry;
+}
+
+struct attrList* classAttrLookup(char* cname, char* aname){
+    struct classTable* ctype = cLookup(cname);
+    struct attrList* alist = ctype->memfield;
+    while(alist){
+        if(strcmp(alist->name,aname)==0) return alist;
+        alist = alist->next;
+    }
+    return NULL;
+}
+
+void classAttrInstall(char* cname, char* typename, char* aname){
+    if(classAttrLookup(cname,aname))
+        yyerror("Multiple attributes with same name in an class !!\n");
+
+    struct attrList* newEntry = (struct attrList*) malloc(sizeof(struct attrList));
+    newEntry->name = aname;
+    newEntry->findex = undefined;
+    newEntry->type = tLookup(typename);
+    newEntry->ctype = cLookup(typename);
+    newEntry->next = NULL;
+
+    struct classTable* ctype = cLookup(cname);
+    newEntry->next = ctype->memfield;
+    ctype->memfield = newEntry;
+}
+
+struct memberFuncList* classMemLookup(char* cname, char* fname){
+    struct classTable* ctype = cLookup(cname);
+    struct memberFuncList* memList = ctype->vfuncptr;
+    
+    while(memList){
+        if(strcmp(memList->name,fname)==0) return memList;
+        memList = memList->next;
+    }
+    return NULL;
+}
+
+void classMemInstall(char* cname, char* fname, char* type, struct paramList* plist){
+    if(classMemLookup(cname, fname))
+        yyerror("Multiple methods with same name in an class !!\n");
+
+    struct memberFuncList* newEntry = (struct memberFuncList*) malloc(sizeof(struct memberFuncList));
+    newEntry->name = fname;
+    newEntry->type = tLookup(type);
+    newEntry->plist = plist;
+    newEntry->ltop = NULL;
+    newEntry->funcpos = undefined;
+    newEntry->flabel = ++fLabel;
+    newEntry->next = NULL;
+
+    struct classTable* ctype = cLookup(cname);
+    newEntry->next = ctype->vfuncptr;
+    ctype->vfuncptr = newEntry;
+}
+
+void printClassTable(void){
+    struct classTable* top = ctt->top;
+    printf("Class: %s\n", top->name);
+
+    printf("\nField list: %d\n", top->attrcount);
+    struct attrList* alist = top->memfield;
+    while(alist){
+        printf("Name: %s, findex: %d, ",alist->name, alist->findex);
+        alist->type ? printf("type: %s, ",alist->type->name) : printf("type: null, ");
+        alist->ctype ? printf("ctype: %s, \n",alist->ctype->name) : printf("ctype: null\n");
+        alist = alist->next;
+    }
+    
+    printf("\nMethod list: %d\n", top->methodcount);
+    struct memberFuncList* mlist = top->vfuncptr;
+    while(mlist){
+        printf("Name: %s, flabel: %d, type: %s\n",mlist->name, mlist->flabel,mlist->type->name);
+
+        printf("=>Local symbol table for the method\n");
+        struct lsymbol* ls = mlist->ltop;
+        while(ls){
+            printf("Name: %s, type: %s\n",ls->name,ls->type->name);
+            ls = ls->next;
+        }
+
+        printf("=>Parameter list for the method\n");
+        struct paramList* plist = mlist->plist;
+        while(plist){
+            printf("Name: %s, type: %s\n",plist->name,plist->type->name);
+            plist = plist->next;
+        }
+        printf("\n");
+
+
+        mlist = mlist->next;
+    }
+    printf("\n\n");
+}
+
+
 
 /*Functions related to global symbol table */
 // Returns a pointer to the symbol table entry for the variable, returns NULL otherwise
@@ -267,6 +489,7 @@ void gInstall(char* name, struct typeTable* type, int ispointer, int shape0, int
 
     newEnty->name = name;
     newEnty->type = type;
+    newEnty->ctype = NULL;
     newEnty->ispointer = ispointer;
     newEnty->size = (shape0?shape0:1)*(shape1?shape1:1);
     newEnty->shape[0] = shape0;
@@ -276,6 +499,7 @@ void gInstall(char* name, struct typeTable* type, int ispointer, int shape0, int
     newEnty->flabel = -1;
     newEnty->ltop = NULL;
     newEnty->next = NULL; 
+    newEnty->status = undefined;
 
     newEnty->next = gst->top;
     gst->top = newEnty;      
@@ -287,7 +511,9 @@ void printGlobalSymbolTable(void){
 
     struct gsymbol* top = gst->top;
     while(top){
-        printf("name: %s, type: %s, size: %d, binding: %d, shape : %d %d, flabel : %d\n",top->name,top->type->name,top->size,top->binding,top->shape[0],top->shape[1],top->flabel);
+        printf("name: %s, size: %d, binding: %d, shape : %d %d, flabel : %d,",top->name,top->size,top->binding,top->shape[0],top->shape[1],top->flabel);
+        top->ctype ? printf(" ctype: %s,",top->ctype->name) : printf(" ctype: null,");
+        top->type ? printf(" type: %s\n",top->type->name) : printf(" type: null\n");
         top = top->next;
     }
 }
@@ -299,6 +525,7 @@ struct lsymbol* makeLSymbolNode(char* name, struct typeTable* type, int ispointe
     newEntry->name = name;
     newEntry->type = type;
     newEntry->ispointer = ispointer;
+    newEntry->binding = undefined;
     newEntry->next = NULL;
     return newEntry;
 }

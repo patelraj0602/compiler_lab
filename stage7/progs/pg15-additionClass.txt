@@ -1,0 +1,46 @@
+class
+    root{
+        decl
+            int a;
+            int b;
+            int add(int c);
+            int init(int a, int b);
+        enddecl
+        int init(int a , int b){
+            decl
+            enddecl
+            begin
+                self.a = a;
+                self.b = b;
+                return 0;
+            end
+        }
+        int add(int c){
+            decl
+                int r;
+            enddecl
+            begin
+                r = self.a + self.b + c;
+                return r;
+            end
+        }
+    }
+endclass
+
+decl
+    root r;
+enddecl
+
+int main(){
+    decl
+        int x;
+    enddecl
+    begin
+        initialize();
+        r = alloc();
+        r.init(2,5);
+        x = r.add(3);
+        write(x);
+        return 0;
+    end
+}
