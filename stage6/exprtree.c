@@ -1,8 +1,8 @@
 // Comment the #include files before executing the code
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <string.h> 
-// #include "exprtree.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h> 
+#include "exprtree.h"
 
 /*
 / assignNode : You can only do assignment if both side have same type. 

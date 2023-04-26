@@ -129,8 +129,18 @@ struct tnode* createIdNode(char* name, struct tnode* left, struct tnode* right){
         validate(idNode,left,right,NULL,gEntry);
     }
     
-    struct typeTable* type = lEntry ? lEntry->type : gEntry->type;
-    return createTree(noNumber,type,name,idNode,left,right,NULL,gEntry,lEntry,NULL,NULL,NULL); 
+    struct typeTable* type;
+    struct classTable* ctype;
+    if(lEntry){
+        type = lEntry->type;
+        ctype = NULL;
+    }else{
+        type = gEntry->type;
+        ctype = gEntry->ctype;
+    }
+    return createTree(noNumber,type,name,idNode,left,right,NULL,gEntry,lEntry,NULL,ctype,NULL);
+    // struct typeTable* type = lEntry ? lEntry->type : gEntry->type;
+    // return createTree(noNumber,type,name,idNode,left,right,NULL,gEntry,lEntry,NULL,NULL,NULL); 
 }
 
 struct tnode* createArgsNode(struct tnode* left){
@@ -215,20 +225,39 @@ struct tnode* makeDotOperatorNode1(char* n1, char* n2){
     return NULL;
 }
 
+/* NOTE: Change this to support concatination of classes attributes too */
+/* Simply need to give attribute->ctype with an attribute name: therefore changing ctype and name fields*/
+/* Probably do the above things for right tnode also. */
 struct tnode* makeDotOperatorNode2(struct tnode* left, char* r){
-    struct typeTable* type = left->type;
-    struct fieldList* field = type->fields;
-    while(field){
-        if(strcmp(field->name,r)==0){
-            struct tnode* right = createTree(field->findex,field->type,r,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
-            return createTree(noNumber,field->type,".",dotOperatorNode,left,right,NULL,NULL,NULL,NULL,NULL,NULL);
-        }
-        field = field->next;
+    // For supporting concatination of class fields
+    if(left->ctype){
+        struct classTable* ctype = left->ctype;
+        struct attrList* attribute = classAttrLookup(ctype->name, r);
+        if(!attribute) 
+            yyerror("attribute not present in field list of class !!\n");
+        
+        struct tnode* right = createTree(attribute->findex,attribute->type,NULL,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL,attribute->ctype,NULL);
+        return createTree(noNumber,attribute->type,NULL,dotOperatorNode,left,right,NULL,NULL,NULL,NULL,attribute->ctype,NULL);
     }
-    yyerror("No matching field for the given identifier!!");
-    return NULL;
+    // To support concatination of user defined types
+    else{
+        struct typeTable* type = left->type;
+        struct fieldList* field = type->fields;
+        while(field){
+            if(strcmp(field->name,r)==0){
+                struct tnode* right = createTree(field->findex,field->type,r,fieldNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+                return createTree(noNumber,field->type,".",dotOperatorNode,left,right,NULL,NULL,NULL,NULL,NULL,NULL);
+            }
+            field = field->next;
+        }
+        yyerror("No matching field for the given identifier!!");
+        return NULL;
+    }
 }
 
+/* NOTE: Change this to support concatination of classes attributes too */
+/* Simply need to give attribute->ctype with an attribute name: therefore changing ctype and name fields*/
+/* Probably do the above things for right tnode also. */
 struct tnode* makeDotOperatorNode3(char* attr){
     struct attrList* attribute = classAttrLookup(curClass,attr);
     if(!attribute) 
@@ -286,7 +315,9 @@ struct tnode* makeMethodNode1(char* fname, struct tnode* arglist){
     }
 
     struct tnode* left = createTree(noNumber,tLookup("void"),NULL,selfNode,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
-    return createTree(mnode->flabel,mnode->type,mnode->name,callerNode,left,NULL,NULL,NULL,mnode->ltop,arglist,NULL,mnode->plist);
+
+    // Adding function position number in the number field to utilize it later.
+    return createTree(mnode->funcpos,mnode->type,mnode->name,callerNode,left,NULL,NULL,NULL,mnode->ltop,arglist,NULL,mnode->plist);
 }
 
 struct tnode* makeMethodNode2(char* objname, char* fname, struct tnode* arglist){
@@ -315,7 +346,9 @@ struct tnode* makeMethodNode2(char* objname, char* fname, struct tnode* arglist)
     }
 
     struct tnode* left = createTree(noNumber,NULL,NULL,idNode,NULL,NULL,NULL,gLookup(objname),NULL,NULL,NULL,NULL);
-    return createTree(mnode->flabel,mnode->type,mnode->name,callerNode,left,NULL,NULL,NULL,mnode->ltop,arglist,NULL,mnode->plist);
+    
+    // Adding function position number in the number field to utilize it later.
+    return createTree(mnode->funcpos,mnode->type,mnode->name,callerNode,left,NULL,NULL,NULL,mnode->ltop,arglist,NULL,mnode->plist);
 }
 
 struct tnode* makeMethodNode3(struct tnode* left, char* fname, struct tnode* arglist){
@@ -339,13 +372,40 @@ struct tnode* makeMethodNode3(struct tnode* left, char* fname, struct tnode* arg
         pl = pl->next;
         ag = ag->arglist;
     }
-    return createTree(mnode->flabel,mnode->type,mnode->name,callerNode,left,NULL,NULL,NULL,mnode->ltop,arglist,NULL,mnode->plist);
+    
+    // Adding function position number in the number field to utilize it later.
+    return createTree(mnode->funcpos,mnode->type,mnode->name,callerNode,left,NULL,NULL,NULL,mnode->ltop,arglist,NULL,mnode->plist);
 }
+
+// Only parent variable can refer child object
+int isParent(char* parent, char* child){
+    struct classTable* cc = cLookup(child);
+    while(cc){
+        if(strcmp(cc->name, parent)==0) return 1;
+        cc = cc->parentptr;
+    }
+    return 0;
+}
+
+// Harcoding so that it works only for new statements in main.
+struct tnode* makeNewNode(struct tnode* left, char* cname){
+    struct classTable* cEntry = left->ctype;
+    if(!cLookup(cname)) yyerror("Dynamic allocation using new keyword can only be used for classes !!\n");
+    if(!cEntry) yyerror("identifier is not an object of class. New key cannot be used !!\n");
+    if(!isParent(cEntry->name, cname)) yyerror("Child object can only be referred by its parent!!\n");
+
+    struct classTable* ctype = cLookup(cname);
+    int virFunTableAddr = 4096+(ctype->classindex)*8;
+
+    return createTree(virFunTableAddr,tLookup("void"),NULL,newKeyWordNode,left,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+}
+
 // INITIALIZING FUNCTIONS.
 
 
 /* Functions related to class table, member functions and attribute list */
 struct classTable* cLookup(char* name){
+    if(name == NULL) return NULL;                           // Small fix
     struct classTable* top = ctt->top;
     while(top){
         if(strcmp(top->name,name)==0) return top;
@@ -359,22 +419,68 @@ void cInstall(char* name, char* parentName){
     else if(tLookup(name)) yyerror("Class name conflicting already declared user defined type !!\n");
 
     struct classTable* newEntry = (struct classTable*) malloc(sizeof(struct classTable));
-    
+    struct classTable* ptnode = cLookup(parentName);
+
     newEntry->name = name;
-    newEntry->memfield = NULL;
-    newEntry->vfuncptr = NULL;
-    newEntry->parentptr = NULL;
-    newEntry->classindex = undefined;
-    newEntry->attrcount = undefined;
-    newEntry->methodcount = undefined;
+    newEntry->parentptr = ptnode;
+    newEntry->attrcount = ptnode ? ptnode->attrcount : 0;
+    newEntry->methodcount = ptnode ? ptnode->methodcount : 0;
     newEntry->next = NULL;
 
-    newEntry->next = ctt->top;
-    ctt->top = newEntry;
+    // copy the memfield of parent class to the current class
+    struct attrList* alist = ptnode ? ptnode->memfield : NULL;
+    struct attrList* pre = NULL; struct attrList* top = NULL;
+    while(alist){
+        struct attrList* newattr = (struct attrList*) malloc(sizeof(struct attrList));
+        memcpy(newattr,alist,sizeof(*newattr));
+        if(!pre) {
+            pre = newattr;
+            top = newattr;
+        }else{
+            pre->next = newattr;
+            pre = pre->next;
+        }
+        alist = alist->next;
+    }
+    newEntry->memfield = top;
+
+    // copy methods of parent class to current class
+    struct memberFuncList* mlist = ptnode ? ptnode->vfuncptr : NULL;
+    struct memberFuncList* pre1 = NULL; struct memberFuncList* top1 = NULL;
+    while(mlist){
+        struct memberFuncList* newmethod = (struct memberFuncList*) malloc(sizeof(struct memberFuncList));
+        memcpy(newmethod,mlist,sizeof(*newmethod));
+        if(!pre1) {
+            pre1 = newmethod;
+            top1 = newmethod;
+        }else{
+            pre1->next = newmethod;
+            pre1 = pre1->next;
+        }
+        mlist = mlist->next;
+    }
+    newEntry->vfuncptr = top1;
+
+    // Adding the newly formed class node at the end of list
+    struct classTable* temp = ctt->top;
+    int classindex = 1;
+    if(!temp) {
+        newEntry->classindex = 0;
+        ctt->top = newEntry;
+    }else{
+        while(temp->next) {
+            temp=temp->next;
+            classindex += 1;
+        }
+        newEntry->classindex = classindex;
+        temp->next = newEntry;
+    }
 }
 
 struct attrList* classAttrLookup(char* cname, char* aname){
     struct classTable* ctype = cLookup(cname);
+    if(!ctype) yyerror("No such class name found; error while executing classAttrLookup function");
+ 
     struct attrList* alist = ctype->memfield;
     while(alist){
         if(strcmp(alist->name,aname)==0) return alist;
@@ -385,8 +491,9 @@ struct attrList* classAttrLookup(char* cname, char* aname){
 
 void classAttrInstall(char* cname, char* typename, char* aname){
     if(classAttrLookup(cname,aname))
-        yyerror("Multiple attributes with same name in an class !!\n");
+        yyerror("Attribute of the parent class cannot be overwritten");
 
+    // Else add the attribute to the attribute list at the end of list
     struct attrList* newEntry = (struct attrList*) malloc(sizeof(struct attrList));
     newEntry->name = aname;
     newEntry->findex = undefined;
@@ -395,14 +502,33 @@ void classAttrInstall(char* cname, char* typename, char* aname){
     newEntry->next = NULL;
 
     struct classTable* ctype = cLookup(cname);
-    newEntry->next = ctype->memfield;
-    ctype->memfield = newEntry;
+    struct attrList* alist = ctype->memfield;
+    
+    // If attribute list is empty, then
+    if(!alist){
+        newEntry->findex = 0;
+        ctype->memfield = newEntry;
+    }
+    else{
+        int ind=1;
+        while(alist->next){
+            alist=alist->next;
+            ind += 1;
+        }
+        newEntry->findex = alist->ctype ? alist->findex + 2 : alist->findex + 1;
+        alist->next = newEntry;
+    }
+    ctype->attrcount += 1;
+
+    if(newEntry->findex >= 8) 
+        yyerror("Too many field for the given class!! Only 1 block of heap is allocated per class!!\n");
 }
 
 struct memberFuncList* classMemLookup(char* cname, char* fname){
     struct classTable* ctype = cLookup(cname);
+    if(!ctype) yyerror("No such class name found; error while executing classMemLookup function");
+
     struct memberFuncList* memList = ctype->vfuncptr;
-    
     while(memList){
         if(strcmp(memList->name,fname)==0) return memList;
         memList = memList->next;
@@ -410,61 +536,98 @@ struct memberFuncList* classMemLookup(char* cname, char* fname){
     return NULL;
 }
 
+// Assuming that the same class won't have multiple functions with same name
 void classMemInstall(char* cname, char* fname, char* type, struct paramList* plist){
-    if(classMemLookup(cname, fname))
-        yyerror("Multiple methods with same name in an class !!\n");
+    struct memberFuncList* mlist = classMemLookup(cname, fname);
+    if(mlist){
+        // overridden function
+        mlist->name = fname;
+        mlist->type = tLookup(type);
+        mlist->plist = plist;
+        mlist->ltop = NULL;
+        mlist->flabel = ++fLabel;
+    }
+    else{
+        // Join the new method to the end of list now.
+        struct memberFuncList* newEntry = (struct memberFuncList*) malloc(sizeof(struct memberFuncList));
+        newEntry->name = fname;
+        newEntry->type = tLookup(type);
+        newEntry->plist = plist;
+        newEntry->ltop = NULL;
+        newEntry->flabel = ++fLabel;
+        newEntry->next = NULL;
 
-    struct memberFuncList* newEntry = (struct memberFuncList*) malloc(sizeof(struct memberFuncList));
-    newEntry->name = fname;
-    newEntry->type = tLookup(type);
-    newEntry->plist = plist;
-    newEntry->ltop = NULL;
-    newEntry->funcpos = undefined;
-    newEntry->flabel = ++fLabel;
-    newEntry->next = NULL;
+        struct classTable* ctype = cLookup(cname);
+        struct memberFuncList* mtop = ctype->vfuncptr;
+        
+        // If member function list is empty
+        if(!mtop){
+            newEntry->funcpos = 0;
+            ctype->vfuncptr = newEntry;
+        }
+        else{
+            int ind=1;
+            while(mtop->next){
+                mtop = mtop->next;
+                ind += 1;
+            }
+            newEntry->funcpos = ind;
+            mtop->next = newEntry;
+        }
+        ctype->methodcount += 1;
+    }
+}
 
-    struct classTable* ctype = cLookup(cname);
-    newEntry->next = ctype->vfuncptr;
-    ctype->vfuncptr = newEntry;
+int getClassTableSize(){
+    struct classTable* tp = ctt->top;
+    int size = 0;
+    while(tp){
+        size++;
+        tp = tp->next;
+    }
+    return size;
 }
 
 void printClassTable(void){
     struct classTable* top = ctt->top;
-    printf("Class: %s\n", top->name);
+    while(top){
+        printf("Class: %s, index: %d\n", top->name, top->classindex);
 
-    printf("\nField list: %d\n", top->attrcount);
-    struct attrList* alist = top->memfield;
-    while(alist){
-        printf("Name: %s, findex: %d, ",alist->name, alist->findex);
-        alist->type ? printf("type: %s, ",alist->type->name) : printf("type: null, ");
-        alist->ctype ? printf("ctype: %s, \n",alist->ctype->name) : printf("ctype: null\n");
-        alist = alist->next;
-    }
-    
-    printf("\nMethod list: %d\n", top->methodcount);
-    struct memberFuncList* mlist = top->vfuncptr;
-    while(mlist){
-        printf("Name: %s, flabel: %d, type: %s\n",mlist->name, mlist->flabel,mlist->type->name);
-
-        printf("=>Local symbol table for the method\n");
-        struct lsymbol* ls = mlist->ltop;
-        while(ls){
-            printf("Name: %s, type: %s\n",ls->name,ls->type->name);
-            ls = ls->next;
+        printf("\nField list: %d\n", top->attrcount);
+        struct attrList* alist = top->memfield;
+        while(alist){
+            printf("Name: %s, findex: %d, ",alist->name, alist->findex);
+            alist->type ? printf("type: %s, ",alist->type->name) : printf("type: null, ");
+            alist->ctype ? printf("ctype: %s, \n",alist->ctype->name) : printf("ctype: null\n");
+            alist = alist->next;
         }
+        
+        printf("\nMethod list: %d\n", top->methodcount);
+        struct memberFuncList* mlist = top->vfuncptr;
+        while(mlist){
+            printf("Name: %s, flabel: %d, type: %s, funcpos: %d\n",mlist->name, mlist->flabel,mlist->type->name,mlist->funcpos);
 
-        printf("=>Parameter list for the method\n");
-        struct paramList* plist = mlist->plist;
-        while(plist){
-            printf("Name: %s, type: %s\n",plist->name,plist->type->name);
-            plist = plist->next;
+            printf("=>Local symbol table for the method\n");
+            struct lsymbol* ls = mlist->ltop;
+            while(ls){
+                printf("Name: %s, type: %s\n",ls->name,ls->type->name);
+                ls = ls->next;
+            }
+
+            printf("=>Parameter list for the method\n");
+            struct paramList* plist = mlist->plist;
+            while(plist){
+                printf("Name: %s, type: %s\n",plist->name,plist->type->name);
+                plist = plist->next;
+            }
+            printf("\n");
+
+
+            mlist = mlist->next;
         }
-        printf("\n");
-
-
-        mlist = mlist->next;
+        printf("\n\n");
+        top = top->next;
     }
-    printf("\n\n");
 }
 
 

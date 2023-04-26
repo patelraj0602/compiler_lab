@@ -1,0 +1,43 @@
+class
+    A{
+        decl
+            int f0(int x, int y);
+        enddecl
+
+        int f0(int x, int y){
+            decl
+                int val;
+            enddecl
+            begin
+                if(y <= 0) then 
+                    val = x;
+                else
+                    write("In this");
+                    val = self.f0(self.f0(x-1,y-1), y-1);
+                endif;
+                return val;
+            end
+        }
+    }
+endclass
+
+decl
+    A obj;
+enddecl
+
+int main(){
+    decl
+        int x,y,ret;
+    enddecl
+    begin
+        initialize();
+        obj = new(A);
+        
+        read(x);
+        read(y);
+
+        ret = obj.f0(x,y);
+        write(ret);
+        return 0;
+    end
+}

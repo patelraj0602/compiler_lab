@@ -1,92 +1,46 @@
-type
-    list{
-        int data;
-        list next;
-    }
-endtype
 class
-    linkedlist{
+    fact{
         decl
-            list head;
-            list tail;
-            int length;
-            int getlength();
-            int init();
-            list insert(int data);
-            int printlinkedlist();
+            int x;
+            int A(int n);
+            int B(int n);
         enddecl
-        int getlength(){
-            decl enddecl
-            begin
-                return self.length;
-            end
-        }
-        int init(){
-            decl enddecl
-            begin
-                self.head=null;
-                self.tail=null;
-                self.length=0;
-                return 1;
-            end
-        }
-        list insert(int data){
+
+        int A(int n){
             decl
-                list temp;
+                int p;
             enddecl
             begin
-                temp=alloc();
-                temp.data=data;
-                temp.next=null;
-                if(self.head== null) then
-                    self.head=temp;
-                    self.tail=temp;
-                else
-                    self.tail.next=temp;
-                    self.tail=temp;
-                endif;
-                self.length=self.length+1;
-                return temp;
+                write("This is in A");
+                p = self.B(10);
+                return 0;
             end
         }
-        int printlinkedlist(){
+        int B(int n){
             decl
-                list temp;
+                int p;
             enddecl
             begin
-                temp=self.head;
-                while(temp!= null) do
-                    write(temp.data);
-                    temp=temp.next;
-                endwhile;
-                return 1;
+                write("This is in B");
+                return 0;
             end
         }
     }
 endclass
 
 decl
-    linkedlist obj,obj2;
+    fact obj;
 enddecl
 
 int main(){
     decl
-        int x,y,z;
-        list a;
+        int x,n;
     enddecl
     begin
         initialize();
-        obj=alloc();
-        x=obj.init();
-        obj2 = obj;
-        read(x);
-        while(x!=0) do
-            read(y);
-            a=obj2.insert(y);
-            x=x-1;
-        endwhile;
-        write(obj2.getlength());
-        x=obj2.printlinkedlist();
-    return 1;
-end
+        obj = new(fact);
+        read(n);
+        obj.A(5);
+        return 1;
+    end
 }

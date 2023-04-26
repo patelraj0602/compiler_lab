@@ -98,7 +98,8 @@ extern int yydebug;
     ENDCLASS = 304,
     NEW = 305,
     DELETE = 306,
-    SELF = 307
+    SELF = 307,
+    EXTENDS = 308
   };
 #endif
 /* Tokens.  */
@@ -152,6 +153,7 @@ extern int yydebug;
 #define NEW 305
 #define DELETE 306
 #define SELF 307
+#define EXTENDS 308
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -167,7 +169,7 @@ union YYSTYPE
   struct paramList* pl;
   struct fieldList* fl;
 
-#line 171 "y.tab.h"
+#line 173 "y.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

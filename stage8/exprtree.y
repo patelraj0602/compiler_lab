@@ -53,7 +53,7 @@ char* curClass = NULL;                                  // Store the class name 
 %token TYPE ENDTYPE
 %token ALLOC INITIALIZE FREE NULL_PTR
 %token CLASS ENDCLASS
-%token NEW DELETE SELF
+%token NEW DELETE SELF EXTENDS
 
 %nonassoc AND OR
 %nonassoc LT GT LE GE NE ET
@@ -67,16 +67,24 @@ char* curClass = NULL;                                  // Store the class name 
 
 // GLOBAL DECLARATION BLOCK : For declaring variables and functions.
 program : gClassBlock {
-        printPrefix($1);
-        helperFunction($1);
+        printf("Presenting the class table: \n"); printClassTable();
+        // printPrefix($1);
+        // helperFunction($1);
+      }
+    | gClassBlock gDeclBlock {
+        printf("Presenting the class table: \n"); printClassTable();
+        printGlobalSymbolTable();
       }
     | gTypeBlock gClassBlock {
         printf("hurray!!\n");
-        printPrefix($2);
-        helperFunction($2);
+        printTypeTable();
+        printf("Presenting the class table: \n"); printClassTable();
+        
+        // Backend part
+        // printPrefix($2);
+        // helperFunction($2);
       } 
     | gClassBlock gDeclBlock mainBlock {
-        printTypeTable();
         printf("Presenting the class table: \n"); printClassTable();
         printGlobalSymbolTable();
         printLocalSymbolTable();
@@ -140,28 +148,13 @@ className : ID  {
       cInstall($1,NULL);                            // Make an entry in class table
       curClass = $1;
     }
+  | ID EXTENDS ID {
+      cInstall($1,$3);
+      curClass = $1;
+    } 
   ;
 
-gClassDeclBlockSeg : gClassDeclBlock {
-      // Initialize the value of attribute count and method count
-      struct classTable* ctype = cLookup(curClass);
-      struct attrList* alist = ctype->memfield;
-      struct memberFuncList* memlist = ctype->vfuncptr;
-
-      int count=0;
-      while(alist){
-        alist->findex = count++;
-        alist = alist->next;
-      }
-      ctype->attrcount = count;
-
-      count=0;
-      while(memlist){
-        memlist->funcpos = count++;
-        memlist = memlist->next;
-      }
-      ctype->methodcount = count;
-    }
+gClassDeclBlockSeg : gClassDeclBlock {}
   ;
 
 gClassDeclBlock : DECL gClassAttrDeclList gClassFuncDeclList ENDDECL {}
@@ -338,6 +331,8 @@ gTypeIdList : gTypeIdList ',' ID {
 gDeclBlock : DECL gDeclList ENDDECL {
       // Binding of variables   
       struct gsymbol* top = gst->top;
+      binding += 8*getClassTableSize();
+
       while(top){
         if(top->flabel == -1){
           top->binding = binding+1;
@@ -373,6 +368,9 @@ gDecl : type gidList SEMICOLON {
           // For ctype
           top->ctype = cLookup($1);
           top->status = definedDone;
+
+          // Also setting size of class variables to 2
+          if(top->ctype) top->size = 2;
         }
         top = top->next;
       }
@@ -582,9 +580,9 @@ stmt : inputStmt {$$ = $1;}
 	| INITIALIZE '(' ')' SEMICOLON {$$ = makeMemInitNode();}
 	| FREE '(' identifier ')' SEMICOLON {$$ = makeFreeNode($3);}
   | fieldFunction SEMICOLON {$$ = $1;}
+  | identifier ASSIGN NEW '(' ID ')' SEMICOLON {$$ = makeNewNode($1,$5);}
   ;
-  // identifier ASSIGN NEW '(' ID ')' SEMICOLON
-  // DELETE '(' identifier ')' SEMICOLON
+  // Make delete node later here
 
 inputStmt : READ '(' identifier ')' SEMICOLON {$$ = createTree(noNumber,tLookup("void"),NULL,readNode,$3,NULL,NULL,NULL,NULL,NULL,NULL,NULL);}
   ;
@@ -592,6 +590,7 @@ inputStmt : READ '(' identifier ')' SEMICOLON {$$ = createTree(noNumber,tLookup(
 outputStmt : WRITE '(' expr ')' SEMICOLON {$$ = createTree(noNumber,tLookup("void"),NULL,writeNode,$3,NULL,NULL,NULL,NULL,NULL,NULL,NULL);}
   ;
 
+// Add support for assignment of class objects. To test use (https://silcnitc.github.io/expl-docs/oexpltestprograms/test5/)
 assignStmt : identifier ASSIGN expr SEMICOLON {$$ = createTree(noNumber,tLookup("void"),NULL,assignNode,$1,$3,NULL,NULL,NULL,NULL,NULL,NULL);}
   | identifier ASSIGN ADDR identifier SEMICOLON {
       struct tnode* newAddrNode = createAddrNode($4);

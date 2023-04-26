@@ -1,20 +1,45 @@
+type
+  List
+  {
+    int data;
+    List next;
+  }
+endtype
+
 decl
-    int n, fun(int p, int q, int r);
+    List head,revHead,reverse(List head, int len);
 enddecl
 
-int fun(int p, int q, int r){
+List reverse(List head, int len){
     decl
+        List l,temp;
     enddecl
     begin
+        write(head);
+        return null;
     end
 }
 
-int main(){
-    decl
-        int result,a,b,c;
-    enddecl
-    begin
-        result = fun(a+b,b+c,c+a);
-        return 0;
-    end
+int main()
+{
+  decl
+    int length,len2, x;
+    int* temp;
+    List p, q;
+  enddecl
+
+  begin
+    initialize();
+
+    temp = null;
+    revHead = null;
+    revHead = reverse(null,length);
+    write(revHead);
+
+    x = *temp;
+    x = *p;
+    temp = &x;
+
+    return 1;
+  end
 }

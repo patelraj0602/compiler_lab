@@ -1,0 +1,8 @@
+made changes to getAddressOfIdentifier function in codegen
+assignment node for assignment between class objects
+major changes in caller node
+changed size of the class objects if they are present in field of classes
+slightly changed makeDotOperator2 function
+changed createIdNode such that it contains pointer to classes too
+changes made in makeNewNode
+minor changes in codegen for callerfunction and make newnode

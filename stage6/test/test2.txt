@@ -1,16 +1,27 @@
+type
+  bst{
+  int a;
+  bst left;
+  bst right;
+  }
+endtype
+
 decl
-    int n,fibo(str s,int i),*x[5];
-    str p;
+  int in,opt;
+  bst insert(bst h, int key);
+  int inOrder(bst h);
+  int preOrder(bst h);
+  int postOrder(bst h);
 enddecl
 
-int main(){
-    decl
-        int result;
-    enddecl
-    begin
-        read(n);
-        write(*x[2]);
-        result = fibo(p,n);
-        return 0;
-    end
+int main()
+{
+  decl
+  int val,flag;
+  bst Root;
+  enddecl
+
+  begin
+    Root.left.a = 5;
+  end
 }

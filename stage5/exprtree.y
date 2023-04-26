@@ -48,10 +48,11 @@ int fLabel = -1;                                        // Stores function label
 %token MAIN RETURN
 %token AND OR
 
-%left LT GT LE GE NE ET AND OR
+%nonassoc AND OR
+%nonassoc LT GT LE GE NE ET
 %left PLUS MINUS 
 %left STAR DIV
-%left ADDR
+%right ADDR
  
 %%
 

@@ -3,6 +3,7 @@
 // #include <stdlib.h>
 // #include "exprtree.h" 
 // #include "registers.h"
+/* Store Registers before making an system call */
 
 
 // Implementation of stack used for continue and break statements.
@@ -60,9 +61,25 @@ int getLabel(void){
 // Function foor making header
 // Updated
 void makeHeader(FILE* targetFile){
-    fprintf(targetFile ,"0\nmain\n0\n0\n0\n0\n0\n0\nBRKP\n");
+    fprintf(targetFile ,"0\nmain\n0\n0\n0\n0\n0\n0\n");
 }
 
+void makeVirtualFunctionTable(FILE* targetFile){
+    // Make an virtual function table here;
+    struct classTable* ct = ctt->top;
+    int bd = 4095;
+    while(ct){
+        struct memberFuncList* ml = ct->vfuncptr;
+        for(int i=0; i<8; i++){
+            if(ml) {
+                fprintf(targetFile, "MOV [%d], F%d\n", ++bd,ml->flabel);
+                ml = ml->next;
+            }
+            else fprintf(targetFile, "MOV [%d], %d\n", ++bd,-1);
+        }
+        ct = ct->next;
+    }   
+}
 
 
 // Implementing system calls
@@ -171,21 +188,21 @@ int getAddressOfIdentifier(struct tnode* t, FILE* targetFile){
 
     // Used while assignNode: Support for 1-2d arrays are yet to added for this pointerNode
     // Also that variable should be an global variable
-    if(t->left->nodetype == pointerNode){
+    if(t->nodetype == pointerNode){
         r1 = getAddressOfIdentifier(t->left, targetFile);
         fprintf(targetFile, "MOV R%d, [R%d]\n",r1,r1);
     }
-    else if(t->left->nodetype == dotOperatorNode){
+    else if(t->nodetype == dotOperatorNode){
         // If the identifier is an field
-        r1 = codeGen(t->left->left, targetFile);
-        r2 = codeGen(t->left->right, targetFile);
+        r1 = codeGen(t->left, targetFile);
+        r2 = codeGen(t->right, targetFile);
         fprintf(targetFile, "ADD R%d, R%d\n",r1,r2);
         freeReg();
     }
     else{
         r1 = getReg();
-        gstValue = t->left->gentry;
-        lstValue = t->left->lentry;
+        gstValue = t->gentry;
+        lstValue = t->lentry;
         tempValue = (lstValue) ? lstValue->binding : gstValue->binding;
 
         if(lstValue){
@@ -194,19 +211,19 @@ int getAddressOfIdentifier(struct tnode* t, FILE* targetFile){
         }
         else{
             fprintf(targetFile, "MOV R%d, %d\n",r1,tempValue);
-            if((t->left->left != NULL)&&(t->left->right == NULL)) {
-                r2 = codeGen(t->left->left,targetFile);
+            if((t->left != NULL)&&(t->right == NULL)) {
+                r2 = codeGen(t->left,targetFile);
                 fprintf(targetFile, "ADD R%d, R%d\n",r1,r2);
                 freeReg();
             }
-            else if((t->left->left)&&(t->left->right)) {
-                r2 = codeGen(t->left->left,targetFile);
+            else if((t->left)&&(t->right)) {
+                r2 = codeGen(t->left,targetFile);
 
                 tempValue = gstValue->shape[1];
                 fprintf(targetFile, "MUL R%d, %d\n", r2, tempValue);
                 fprintf(targetFile, "ADD R%d, R%d\n", r1, r2);
                 freeReg();
-                r2 = codeGen(t->left->right,targetFile);
+                r2 = codeGen(t->right,targetFile);
                 fprintf(targetFile, "ADD R%d, R%d\n", r1, r2);
                 freeReg();
             }
@@ -233,6 +250,7 @@ int codeGen(struct tnode* t, FILE* targetFile){
     reg_index rightReg;
     reg_index retReg;
 
+    int v1,v2;
     reg_index r1,r2,r3;
 
     switch(t->nodetype){
@@ -277,18 +295,30 @@ int codeGen(struct tnode* t, FILE* targetFile){
 
         // No change
         case readNode :
-                        leftReg = getAddressOfIdentifier(t,targetFile);
+                        leftReg = getAddressOfIdentifier(t->left,targetFile);
                         readFunctionCall(targetFile, leftReg);
                         freeReg();                                   // This register was acquired in "getAddressOfIdentifier" function
                         break;
 
         // No change
         case assignNode :
-                        leftReg = getAddressOfIdentifier(t,targetFile);
-                        rightReg = codeGen(t->right, targetFile);
-                        fprintf(targetFile, "MOV [R%d], R%d\n", leftReg, rightReg);
-                        freeReg();                                                      // This register was acquired in "getAddressOfIdentifier" function
-                        freeReg();                                                      // Register from right recursive function call.
+                        // Assigning class object to an class object: Supported for simple assigning only
+                        if(((t->left->gentry)&&(t->left->gentry->ctype))&&((t->right->gentry)&&(t->right->gentry->ctype))){
+                            leftReg = getAddressOfIdentifier(t->left, targetFile);
+                            rightReg = getAddressOfIdentifier(t->right, targetFile);
+                            fprintf(targetFile, "MOV [R%d], [R%d]\n", leftReg, rightReg);
+                            fprintf(targetFile, "INR R%d\n",leftReg);
+                            fprintf(targetFile, "INR R%d\n",rightReg);
+                            fprintf(targetFile, "MOV [R%d], [R%d]\n", leftReg, rightReg);
+
+                        }
+                        else{
+                            leftReg = getAddressOfIdentifier(t->left,targetFile);
+                            rightReg = codeGen(t->right, targetFile);
+                            fprintf(targetFile, "MOV [R%d], R%d\n", leftReg, rightReg);
+                            freeReg();                                                      // This register was acquired in "getAddressOfIdentifier" function
+                            freeReg();                                                      // Register from right recursive function call.
+                        }
                         break;
 
         // Updated
@@ -330,15 +360,15 @@ int codeGen(struct tnode* t, FILE* targetFile){
 
         // Updated
         case pointerNode :
-                        retReg = getAddressOfIdentifier(t,targetFile);
+                        retReg = getAddressOfIdentifier(t->left,targetFile);
                         fprintf(targetFile, "MOV R%d, [R%d]\n",retReg,retReg);
                         fprintf(targetFile, "MOV R%d, [R%d]\n",retReg,retReg);
                         return retReg;
 
         // No change
         case addrNode : 
-                        // change the argument to t->left for generalizing later..
-                        retReg = getAddressOfIdentifier(t,targetFile);
+                        // DONE: change the argument to t->left for generalizing later..
+                        retReg = getAddressOfIdentifier(t->left,targetFile);
                         return retReg;
 
         // No change
@@ -510,6 +540,7 @@ int codeGen(struct tnode* t, FILE* targetFile){
 
                         // Add label for the function.
                         fprintf(targetFile, "F%d :\n",t->val);
+                        // fprintf(targetFile, "BRKP\n");
                         
                         //Save base pointer
                         fprintf(targetFile, "PUSH BP\n");
@@ -536,7 +567,7 @@ int codeGen(struct tnode* t, FILE* targetFile){
                         pl = t->plist;
 
                         fprintf(targetFile, "MOV R%d, BP\n", fr);
-                        fprintf(targetFile, "SUB R%d, %d\n", fr,len2+3);
+                        fprintf(targetFile, "SUB R%d, %d\n", fr,len2+4);
 
                         for(i=0; i<len2; i++){
                             lstValue = lLookup(pl->name);
@@ -572,18 +603,83 @@ int codeGen(struct tnode* t, FILE* targetFile){
                             argNode = argNode->arglist;
                         }
 
-                        // Pushing self
-                        r1 = codeGen(t->left, targetFile);
-                        (r1>=0) ? fprintf(targetFile,"PUSH R%d\n",r1) : fprintf(targetFile,"PUSH R%d\n",0);  
+                        // Pushing self and top of virtual function table
+                        if(t->left == NULL){
+                            fprintf(targetFile,"PUSH R%d\n",0);
+                            fprintf(targetFile,"PUSH R%d\n",0);
+
+                            // Pushing empty space
+                            fprintf(targetFile,"PUSH R%d\n",0);
+                            count = -1;
+                            fprintf(targetFile, "CALL F%d\n", t->val);
+                        } 
+                        else if((t->left->nodetype == idNode) || (t->left->nodetype == dotOperatorNode)){
+                            leftReg = getAddressOfIdentifier(t->left, targetFile);
+                            fr = getReg();
+                            fprintf(targetFile,"MOV R%d, [R%d]\n",fr,leftReg);
+                            fprintf(targetFile, "PUSH R%d\n",fr);
+                            fprintf(targetFile, "INR R%d\n", leftReg);
+                            fprintf(targetFile,"MOV R%d, [R%d]\n",fr,leftReg);
+                            fprintf(targetFile, "PUSH R%d\n",fr);
+
+                            // Pushing empty space
+                            fprintf(targetFile, "PUSH R%d\n", 0);
+
+                            // Simulataneously calling function in this only.
+                            fprintf(targetFile, "ADD R%d, %d\n",fr,t->val);
+                            fprintf(targetFile, "MOV R%d, [R%d]\n",fr,fr);
+                            count = -1;
+                            fprintf(targetFile, "CALL R%d\n", fr);
+
+                            // freeReg();
+                            // freeReg();
+                        }
+                        // Make sure the push [R0] type ot instruction work
+                        else if(t->left->nodetype == selfNode){
+                            fr = getReg();
+                            r1 = getReg();
+                            fprintf(targetFile, "MOV R%d, BP\n",fr);
+                            fprintf(targetFile, "SUB R%d, %d\n",fr,4);
+                            fprintf(targetFile, "MOV R%d, [R%d]\n",r1,fr);
+                            fprintf(targetFile, "PUSH R%d\n",r1);
+                            fprintf(targetFile, "INR R%d\n",fr);
+                            fprintf(targetFile, "MOV R%d, [R%d]\n",r1,fr);
+                            fprintf(targetFile, "PUSH R%d\n",r1);
+
+                            // Pushing empty space
+                            fprintf(targetFile, "PUSH R%d\n", 0);
+
+                            // Calling function in this
+                            fprintf(targetFile, "ADD R%d, %d\n",r1,t->val);
+                            fprintf(targetFile, "MOV R%d, [R%d]\n",r1,r1);
+                            count = -1;
+                            fprintf(targetFile, "CALL R%d\n", r1);
+                            
+                            // freeReg();
+                        }
 
                         // Pusing empty space for return value and calling function
-                        fprintf(targetFile, "PUSH R%d\n", 0);
+                        // fprintf(targetFile, "PUSH R%d\n", 0);
 
-                        count = -1;
-                        fprintf(targetFile, "CALL F%d\n", t->val);
+                        // // Dynamically binding the jmp statement
+                        // if(t->left == NULL){
+
+                        // }
+                        // else if(t->left->nodetype == idNode){
+
+                        // }
+                        // fr = getReg();
+                        // fprintf(targetFile, "MOV R%d, BP\n",fr);
+                        // fprintf(targetFile, "SUB R%d, %d\n",fr,3);
+                        // fprintf(targetFile, "MOV R%d, [R%d]\n",fr,fr);
+                        // fprintf(targetFile, "ADD R%d, %d\n",fr,t->val);
+                        // fprintf(targetFile, "ADD R%d, [R%d]\n",fr,fr);
+                        // count = -1;
+                        // fprintf(targetFile, "CALL R%d\n", fr);
 
                         // Getting the return value from the function and poping self value
                         fprintf(targetFile, "POP R%d\n", functionRetReg);
+                        fprintf(targetFile, "POP R%d\n", 0);
                         fprintf(targetFile, "POP R%d\n", 0);
 
                         // Poping the arguments from the program stack
@@ -631,9 +727,11 @@ int codeGen(struct tnode* t, FILE* targetFile){
         case mainNode :
                         // Function label for main
                         fprintf(targetFile, "main :\n");
+                        makeVirtualFunctionTable(targetFile);
 
                         // Setting SP and activation record of main
-                        fprintf(targetFile, "PUSH BP\n"); 
+                        // fprintf(targetFile, "PUSH BP\n"); 
+                        // Imagine empty base pointer in that position.
                         binding++;
                         fprintf(targetFile, "MOV BP, %d\n", binding);
                         fprintf(targetFile, "MOV SP, %d\n", binding);
@@ -670,7 +768,7 @@ int codeGen(struct tnode* t, FILE* targetFile){
         case selfNode :
                         fr = getReg();
                         fprintf(targetFile, "MOV R%d, BP\n",fr);
-                        fprintf(targetFile, "SUB R%d, %d\n",fr,3);
+                        fprintf(targetFile, "SUB R%d, %d\n",fr,4);
                         fprintf(targetFile, "MOV R%d, [R%d]\n",fr,fr);
                         return fr;
 
@@ -683,7 +781,7 @@ int codeGen(struct tnode* t, FILE* targetFile){
                         break;
 
         case allocNode :
-                        leftReg = getAddressOfIdentifier(t,targetFile);
+                        leftReg = getAddressOfIdentifier(t->left,targetFile);
 
                         // Store the registers
                         for(i=0; i<=count; i++) fprintf(targetFile, "PUSH R%d\n",i);
@@ -695,6 +793,27 @@ int codeGen(struct tnode* t, FILE* targetFile){
                         for(i=count; i>=0; i--) fprintf(targetFile, "POP R%d\n",i);
 
                         fprintf(targetFile, "MOV [R%d], R%d\n",leftReg,rightReg);
+                        freeReg();
+                        break;
+
+        case newKeyWordNode :
+                        // New keyword can be inside class too.
+                        leftReg = getAddressOfIdentifier(t->left, targetFile);
+
+                        // Store the self value and top of virtual function table
+                        // Store the registers
+                        for(i=0; i<=count; i++) fprintf(targetFile, "PUSH R%d\n",i);
+                        pushInStack(count);                         // Pushing count
+                        
+                        rightReg = memAllocNode(targetFile);
+
+                        count = popFromStack();                     // Popping count
+                        for(i=count; i>=0; i--) fprintf(targetFile, "POP R%d\n",i);
+
+                        fprintf(targetFile, "MOV [R%d], R%d\n",leftReg,rightReg);
+                        fprintf(targetFile, "INR R%d\n", leftReg);
+                        fprintf(targetFile, "MOV [R%d], %d\n",leftReg,t->val);
+
                         freeReg();
                         break;
 

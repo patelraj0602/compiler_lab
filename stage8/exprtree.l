@@ -40,6 +40,7 @@ int number;
 "new"                   {return NEW;}
 "delete"                {return DELETE;}
 "self"                  {return SELF;}
+"extends"               {return EXTENDS;}
 "int"                   {yylval.str = strdup(yytext); return INT;}
 "str"                   {yylval.str = strdup(yytext); return STR;} 
 [a-zA-Z][_a-zA-Z0-9]*    {yylval.str = strdup(yytext); return ID;} 

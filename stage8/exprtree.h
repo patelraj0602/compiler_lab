@@ -48,6 +48,7 @@
 #define nullNode 45
 #define selfNode 46
 #define definedDone 47
+#define newKeyWordNode 48
 
 int varArr[26];
 
@@ -234,6 +235,7 @@ struct tnode* makeMethodNode1(char* fname, struct tnode* arglist);
 struct tnode* makeMethodNode2(char* objname, char* fname, struct tnode* arglist);
 struct tnode* makeMethodNode3(struct tnode* left, char* fname, struct tnode* arglist);
 struct tnode* makeConnectorNode(struct tnode* left, struct tnode* right);
+struct tnode* makeNewNode(struct tnode* left, char* id);
 int operatorCheck(int nodeType);
   
 // Printing different datastructures

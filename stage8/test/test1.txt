@@ -9,6 +9,9 @@ class
     bstclass{
         decl
             bst root;
+            bstclass check;
+            int a,b;
+            bst root2;
             int init();
             bst getroot();
             int setroot(bst n1);
@@ -18,79 +21,38 @@ class
             int preOrder_fun(bst h);
             int postOrder_fun(bst h);
         enddecl
-        int init(){
-            decl
-            enddecl
-            begin
-            end
-        }
-        bst getroot(){
-            decl
-            enddecl
-            begin
-            end
-        }
-        int setroot(bst n1){
-            decl
-            enddecl
-            begin
-            end
-        }
-        bst getnode(int key){
-            decl
-                bst temp;
-            enddecl
-            begin
-            end
-        }
+
         bst insert(bst h, int key){
             decl
             enddecl
             begin
+                if (h == null) then
+                    h = self.getnode(key);
+                else
+                    if (key < h.a) then
+                        h.left = self.insert(h.left, key);
+                    else
+                        if (key > h.a) then
+                            h.right = self.insert(h.right, key);
+                        endif;
+                    endif;
+                endif;
+                return h;
             end
         }
-        int inOrder_fun(bst h){
-            decl
-                int in;
-            enddecl
-            begin
-            end
-        }
-        int preOrder_fun(bst h){
-            decl
-                int in;
-            enddecl
-            begin
-            end
-        }
+
         int postOrder_fun(bst h){
             decl
                 int in;
             enddecl
             begin
+                if(h!= null) then
+                    in=self.postOrder_fun(h.left);
+                    in=self.postOrder_fun(h.right);
+                    write(h.a);
+                endif;
+                return 1;
             end
         }
     }
 endclass
-decl
-    bstclass obj, obj2;
-    int testFunck(int a), temp;
-enddecl
-
-int testFunck(int a){
-  decl
-    int var0,var1;
-    str sr0,str1;
-  enddecl
-  begin
-  end
-}
-
-int main(){
-    decl
-        bst Root;
-        int x,in,val;
-    enddecl
-    begin
-    end
-}
